@@ -1,0 +1,6 @@
+streamlit
+pandas
+matplotlib
+PyYAML
+streamlit-authenticator>=0.4.1
+bcrypt

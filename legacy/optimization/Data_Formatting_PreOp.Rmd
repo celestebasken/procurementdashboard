@@ -1,0 +1,175 @@
+---
+title: "Data_Formatting_PreOp"
+author: "Celeste Basken"
+date: "2026-04-08"
+output: html_document
+---
+
+The purpose of this doc is just to take the Ingredient_prices, GHG_equivalents, and F25_Sp26_meals, and then build the cleaned version of the df which is optimization-ready. 
+
+This used to be done in google sheets (for example, https://docs.google.com/spreadsheets/d/14wqCazTvzhN5UJX_mCnG3Jjdsi1-8abxkL5vip48bFU/edit?gid=763421786#gid=763421786), but that's actually super inefficient and it sucks, so now I'm doing it all in r. 
+
+To change out the data, simply edit the base spreadsheets.
+
+Packages:
+```{r}
+library(dplyr)
+library(readr)
+library(janitor)
+```
+
+## Read Data
+
+```{r}
+safe_mean <- function(x) {
+  if (all(is.na(x))) NA_real_ else mean(x, na.rm = TRUE)
+}
+
+first_nonmissing <- function(x) {
+  x <- x[!is.na(x) & x != ""]
+  if (length(x) == 0) NA_character_ else x[1]
+}
+
+# -------------------------
+# Read + clean
+# -------------------------
+meals <- read.csv("../Basic_Data/F25_Sp26_meals.csv", stringsAsFactors = FALSE) %>%
+  clean_names()
+
+ingredient_prices <- read.csv("../Basic_Data/Ingredient_prices.csv", stringsAsFactors = FALSE) %>%
+  clean_names()
+
+ghg_equivalents <- read.csv("../Basic_Data/GHG_equivalents.csv", stringsAsFactors = FALSE) %>%
+  clean_names()
+
+# -------------------------
+# Standardize values
+# -------------------------
+meals <- meals %>%
+  mutate(
+    dining_hall = trimws(dining_hall),
+    ingredient = trimws(ingredient),
+    category = trimws(category),
+    planned_portions = as.numeric(gsub(",", "", planned_portions)),
+    percent_meat = as.numeric(percent_meat),
+    meat_price_per_dish = as.numeric(meat_price_per_dish),
+    expected_lb_meat_portion = as.numeric(expected_lb_meat_portion),
+    oz_meat_per_dish = as.numeric(oz_meat_per_dish),
+    portion_size_oz = as.numeric(portion_size_oz),
+    planned_weight_lbs = as.numeric(planned_weight_lbs),
+    cost_recipe_per_portion = as.numeric(cost_recipe_per_portion)
+  )
+
+ingredient_prices <- ingredient_prices %>%
+  mutate(
+    ingredient = trimws(ingredient),
+    category = trimws(category),
+    conventional_price_lb = as.numeric(conventional_price_lb),
+    sustainable_price_lb = as.numeric(sustainable_price_lb),
+    default_sus = trimws(default_sus)
+  )
+
+ghg_equivalents <- ghg_equivalents %>%
+  mutate(
+    meat_type = trimws(meat_type),
+    c_footprint_kg_c_per_kg_food = as.numeric(c_footprint_kg_c_per_kg_food)
+  )
+
+```
+
+## Filtering to just one dining hall
+
+If desired, filter to just one dining hall:
+
+```{r}
+meals <- meals %>%
+  filter(dining_hall == "C3")
+
+```
+
+
+## Building optimization df
+
+This will give you the df optimization_data which is ready to use
+
+```{r}
+# =========================================================
+# Build optimization_data
+# =========================================================
+
+ingredient_summary <- meals %>%
+  filter(!is.na(ingredient), ingredient != "") %>%
+  group_by(ingredient) %>%
+  summarise(
+    baseline_freq = n(),
+    percent_dish_meat = safe_mean(percent_meat),
+    meat_price_per_dish = safe_mean(meat_price_per_dish),
+    expected_lb_meat_portion = safe_mean(expected_lb_meat_portion),
+    oz_meat_per_dish = safe_mean(oz_meat_per_dish),
+    portion_size_oz = safe_mean(portion_size_oz),
+    expected_portions = safe_mean(planned_portions),
+    planned_weight_lbs = safe_mean(planned_weight_lbs),
+    cost_recipe_per_portion = safe_mean(cost_recipe_per_portion),
+    category_meals = first_nonmissing(category),
+    .groups = "drop"
+  )
+
+ingredient_lookup <- ingredient_prices %>%
+  distinct(ingredient, .keep_all = TRUE) %>%
+  transmute(
+    ingredient,
+    category_prices = category,
+    conventional_price_lb,
+    sustainable_price_lb,
+    default_sus
+  )
+
+ghg_lookup <- ghg_equivalents %>%
+  distinct(meat_type, .keep_all = TRUE) %>%
+  transmute(
+    category = meat_type,
+    conventional_ghg_per_lb = c_footprint_kg_c_per_kg_food
+  )
+
+optimization_data <- ingredient_summary %>%
+  left_join(ingredient_lookup, by = "ingredient") %>%
+  mutate(
+    category = coalesce(category_prices, category_meals)
+  ) %>%
+  left_join(ghg_lookup, by = "category") %>%
+  select(
+    ingredient,
+    category,
+    percent_dish_meat,
+    meat_price_per_dish,
+    expected_lb_meat_portion,
+    oz_meat_per_dish,
+    conventional_price_lb,
+    sustainable_price_lb,
+    default_sus,
+    portion_size_oz,
+    expected_portions,
+    planned_weight_lbs,
+    cost_recipe_per_portion,
+    conventional_ghg_per_lb,
+    baseline_freq
+  )
+
+optimization_data <- optimization_data %>%
+  mutate(
+    baseline_freq = as.numeric(baseline_freq)
+  )
+
+# -------------------------
+# Quick diagnostics
+# -------------------------
+optimization_data %>%
+  filter(
+    is.na(expected_lb_meat_portion) |
+    is.na(conventional_price_lb) |
+    is.na(sustainable_price_lb) |
+    is.na(default_sus) |
+    is.na(conventional_ghg_per_lb)
+  )
+
+```

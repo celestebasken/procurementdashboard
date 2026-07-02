@@ -1,0 +1,15 @@
+# Data - keep local only
+data/
+
+# Virtual environment - Mac-specific, shouldn't be shared
+venv/
+
+# Python junk
+__pycache__/
+*.pyc
+
+# Mac system file
+.DS_Store
+
+# Secrets, if you add any later (API keys, etc.)
+.env

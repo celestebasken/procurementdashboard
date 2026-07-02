@@ -1,0 +1,343 @@
+---
+title: "DataCleaning1"
+output: html_document
+---
+
+The idea here is to clean the campus data to new sheets that all have the same column names and no duplicates or nonfood items. I'll go one campus at a time.
+
+```{r}
+library(readr)
+library(tidyverse)
+library(stringr)
+
+
+```
+
+
+# UCD_H
+
+```{r}
+UCD_H <- read.csv("../CampusDataRaw/UCD_H.csv")
+
+```
+
+# STEP 1. CLASSIFY by product category
+
+```{r}
+
+subcat_dict <- tribble(
+  ~env_sub_category, ~SIMAP_cat,
+
+  # DAIRY
+  "Milk", "Milk (cow's milk)",
+  "Milk (Flavored)", "Milk (cow's milk)",
+  "Cheese", "Cheese",
+  "Yogurt", "Yogurt",
+  "Whipping Cream", "Cream",
+  "Cream", "Cream",
+  "Ice Cream", "Ice cream",
+  "Egg", "Eggs",
+  "Creamer", "Cream",
+  "Cream Cheese", "Cheese",
+  "Sour Cream", "Cream",
+  "Buttermilk", "Milk (cow's milk)",
+  "Cottage Cheese", "Cheese",
+  "Half & Half", "Cream",
+  "Eggnog", "Milk (cow's milk)",
+
+  # MEAT
+  "Beef", "Beef",
+  "Pork", "Pork (pig meat)",
+  "Chicken", "Chicken and other poultry",
+  "Duck", "Chicken and other poultry",
+  "Turkey", "Chicken and other poultry",
+  "Lamb", "Lamb/mutton & goat meat",
+  
+  # FISH / SEAFOOD
+  
+  "Clam", "Mollusks",
+  "Halibut", "Fish (finfish)",
+  "Catfish", "Fish (finfish)",
+  "SALMON", "Fish (finfish)",
+  "Anchovy", "Fish (finfish)",
+  "BASA", "Fish (finfish)",
+  "Bass", "Fish (finfish)",
+  "CATFISH", "Fish (finfish)",
+  "Lobster", "Crustaceans (shrimp/prawns)",
+  "SHRIMP", "Crustaceans (shrimp/prawns)",
+  "Scallop", "Mollusks",
+  "Tuna", "Fish (finfish)",
+  "Fish", "Fish (finfish)",
+  "Salmon", "Fish (finfish)",
+  "Shrimp", "Crustaceans (shrimp/prawns)",
+
+  # GRAINS / STARCHES
+  "Rice", "Rice",
+  "Pasta", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Bread", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Baked Goods", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Tortilla", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Cereal", "Grains/cereals (except rice)",
+  "Quinoa", "Grains/cereals (except rice)",
+  "Grain", "Grains/cereals (except rice)",
+  "Cracker", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Noodle", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Flour", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Pancake", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Waffle", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Cookie", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Pretzel", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Dough", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Muffin", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Vegan Bread", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Cornmeal", "Corn (Maize) ",
+  "Corn Starch", "Corn (Maize) ",
+  "Popcorn", "Corn (Maize) ",
+  "Hominy", "Corn (Maize) ",
+  "Oatmeal", "Oats (Oatmeal)",
+  "Granola", "Grains/cereals (except rice)",
+  "Starch", "Grains/cereals (except rice)",
+
+  # LEGUMES
+  "Bean", "Beans and pulses (dried)",
+  "Pea", "Beans and pulses (fresh)",
+  "Hummus", "Legumes (misc.)",
+  "Lentil", "Legumes (misc.)",
+  "Beans", "Beans and pulses (dried)",
+  "Peanut Butter", "Peanuts/groundnuts",
+  "Peanut", "Peanuts/groundnuts",
+  "Edamame", "Soybeans/Tofu",
+  "Soybean", "Soybeans/Tofu",
+  "Tofu", "Soybeans/Tofu",
+  "Meat Substitute", "Soybeans/Tofu",
+  "Tempeh", "Soybeans/Tofu",
+  "Falafel", "Legumes (misc.)",
+
+  # FRUIT
+  "Fruit", "Fruits (misc.)",
+  "Berry", "Berries",
+  "Apple", "Apples",
+  "Orange", "Citrus Fruit",
+  "Avocado", "Fruits (misc.)",
+  "Apricot", "Fruits (misc.)",
+  "Banana", "Fruits (misc.)",
+  "Cherry", "Fruits (misc.)",
+  "Grape", "Fruits (misc.)",
+  "Peach", "Fruits (misc.)",
+  "Tangerine", "Citrus Fruit",
+  "Pomegranate", "Fruits (misc.)",
+  "Pear", "Fruits (misc.)",
+  "Persimmon", "Fruits (misc.)",
+  "Kiwi", "Fruits (misc.)",
+  "Blueberry", "Fruits (misc.)",
+  "Lemon", "Citrus Fruit",
+  "Mandarin", "Fruits (misc.)",
+  "Strawberry", "Fruits (misc.)",
+  "Raisin", "Fruits (misc.)",
+  "Pluot", "Fruits (misc.)",
+  "APPLE", "Fruits (misc.)",
+  "Nectarine", "Fruits (misc.)",
+  "Pineapple", "Fruits (misc.)",
+  "Applesauce", "Apples",
+  "Honeydew", "Fruits (misc.)",
+  "Date", "Fruits (misc.)",
+  "Fruit Puree", "Fruits (misc.)",
+  "Lime", "Citrus Fruit",
+  "Mango", "Fruits (misc.)",
+  "Fig", "Fruits (misc.)",
+  "Clementine", "Citrus Fruit",
+  "Grapefruit", "Citrus Fruit ",
+  "Papaya", "Fruits (misc.)",
+  "Plum", "Fruits (misc.)",
+  "Raspberry", "Berries",
+  "Tangarine", "Citrus Fruit",
+  "Watermelon", "Fruits (misc.)",
+  "Yuzu", "Citrus Fruit",
+  "Coconut", "Fruits (misc.)",
+
+  # VEGETABLES
+  "Vegetable", "Vegetables (misc.)",
+  "Tomato", "Tomatoes",
+  "Ketchup", "Tomatoes",
+  "Salsa", "Tomatoes",
+  "Pico de Gallo", "Tomatoes",
+  "Onion", "Onions and Leeks",
+  "Pepper", "Vegetables (misc.)",
+  "Potato", "Potatoes",
+  "Carrot", "Root Vegetables",
+  "Jicama", "Root Vegetables",
+  "Yam- Tuber", "Root Vegetables",
+  "Celery", "Vegetables (misc.)",
+  "Cucumber", "Vegetables (misc.)",
+  "Squash", "Vegetables (misc.)",
+  "Corn", "Maize/Corn",
+  "Mushroom", "Fungi/Mushrooms",
+  "Asparagus", "Vegetables (misc.)",
+  "Zucchini", "Vegetables (misc.)",
+  "Artichoke", "Vegetables (misc.)",
+  "Herb", "Leafy vegetables",
+  "Cauliflower", "Cabbages and other Brassicas (Broccoli)",
+  "Garlic", "Vegetables (misc.)",
+  "Radish", "Vegetables (misc.)",
+  "Lettuce", "Leafy vegetables",
+  "Spinach", "Leafy vegetables",
+  "Brussel sprout", "Vegetables (misc.)",
+  "Arugula", "Leafy vegetables",
+  "Cabbage", "Cabbages and other Brassicas (Broccoli)",
+  "Kimchee", "Cabbages and other Brassicas (Broccoli)",
+  "Salad", "Leafy vegetables",
+  "French Fry", "Potatoes",
+  "Fennel", "Vegetables (misc.)",
+  "Coleslaw", "Cabbages and other Brassicas (Broccoli)",
+  "Pickle", "Vegetables (misc.)",
+  "Root", "Root Vegetables",
+  "Brussel Sprout", "Cabbages and other Brassicas (Broccoli)",
+  "Leaf", "Leafy vegetables",
+  "Romaine", "Leafy vegetables",
+  "Spring Mix", "Leafy vegetables",
+  "Parsnip", "Root Vegetables",
+  "Tomatillo", "Tomatoes",
+  "Watercress", "Leafy vegetables",
+  "Yam", "Cassava and Other Roots",
+  "CABBAGE", "Cabbages and other Brassicas (Broccoli)",
+  "Collard Greens", "Leafy vegetables",
+  "Frisee", "Leafy vegetables",
+  "KALE", "Leafy vegetables",
+  "Kale", "Leafy vegetables",
+  "Leek", "Onions and Leeks",
+  "Lo Bok", "Root Vegetables",
+  "ONION", "Onions and Leeks",
+  "Okra", "Vegetables (misc.)",
+  "Pumpkin", "Vegetables (misc.)",
+  "Radicchio", "Leafy vegetables",
+  "Sauerkraut", "Cabbages and other Brassicas (Broccoli)",
+  "Seaweed", "Vegetables (misc.)",
+  "Sprout", "Vegetables (misc.)",
+  "Sweet Potato", "Potatoes",
+  "Turnip", "Root Vegetables",
+  "Flower", "Vegetables (misc.)",
+  "Micro Green", "Leafy vegetables",
+  "Olive", "Vegetables (misc.)",
+
+  # DRINKS / LIQUIDS / BEVS
+  "Juice", "Liquids",
+  "Broth", "Liquids",
+  "Juice (AddedSugar)", "Liquids",
+  "Water", "Liquids",
+  "Soda", "Liquids",
+  "Sports Drink", "Liquids",
+  "Kombucha", "Liquids",
+  "Diet Soda", "Liquids",
+  "Fruit Juice", "Liquids",
+  "Wine", "Wine Grapes (Wine)",
+  "Vinegar", "Liquids",
+  "Dressing", "Liquids",
+  
+  # PLANT BASED MILKS
+  "Almond Milk", "Almond milk",
+  "Soy Milk", "Soy milk",
+  "Oat Milk", "Oat milk",
+  "Coconut Milk", "Liquids",
+  "Rice Milk", "Rice milk",
+
+  # COFFEE / TEA
+  "Coffee/Tea", "Stimulants",
+  "Coffee/Tea (Sweetened)", "Stimulants",
+
+  # SWEETENERS / COCOA
+  "Sweetener", "Sugars and sweeteners",
+  "Syrup", "Sugars and sweeteners",
+  "Candy", "Sugars and sweeteners",
+  "Honey", "Sugars and sweeteners",
+  "Pudding", "Sugars and sweeteners",
+  "Gelatin", "Sugars and sweeteners",
+  "Chocolate", "Cocoa",
+  "Hot Chocolate", "Cocoa",
+  "Cocoa Powder", "Cocoa",
+  "Caramel", "Sugars and sweeteners",
+  "Molasses", "Sugars and sweeteners",
+  "Jam", "Sugars and sweeteners",
+  "Jelly", "Sugars and sweeteners",
+  "Marmalade", "Sugars and sweeteners",
+  "Fruit Snack", "Sugars and sweeteners",
+
+  # OILS / FATS
+  "Vegetable Oil", "Vegetable oils",
+  "Pesto", "Vegetable oils",
+  "Butter", "Butter",
+  "Oil", "Vegetable oils",
+  "Mayonnaise", "Vegetable oils",
+  "Coconut Oil", "Vegetable oils",
+  "Seed Oil", "Vegetable oils",
+  "Margarine", "Vegetable oils",
+
+  # TREE NUTS & SEEDS
+  "Almond", "Tree nuts and seeds",
+  "Cashew", "Tree nuts and seeds",
+  "Mustard", "Tree nuts and seeds",
+  "Walnut", "Tree nuts and seeds",
+  "Treenut", "Tree nuts and seeds",
+  "Pecan", "Tree nuts and seeds",
+  "Hazelnut", "Tree nuts and seeds",
+  "Pistachio", "Tree nuts and seeds",
+  "Tahini", "Tree nuts and seeds",
+  "Corn Nut", "Corn (Maize) ",
+  "Seed", "Nuts and seeds",
+  
+  # SNACKS
+  "Chip", "Wheat/Rye (Bread, pasta, baked goods)",
+  "Snack Bar", "Wheat/Rye (Bread, pasta, baked goods)",
+
+  # HERBS / SPICES / FLAVORINGS
+  "Spice", "Stimulants & Spices (misc.)",
+  "Mint", "Stimulants & Spices (misc.)",
+  "Vanilla Extract", "Stimulants & Spices (misc.)",
+  "Chicory", "Stimulants & Spices (misc.)",
+  "Curry Powder", "Stimulants & Spices (misc.)",
+  "Ginger", "Stimulants & Spices (misc.)",
+  "Horseradish", "Stimulants & Spices (misc.)",
+  "Parsley", "Stimulants & Spices (misc.)",
+  "Rosemary", "Stimulants & Spices (misc.)",
+  "Thyme", "Stimulants & Spices (misc.)",
+  "Vanilla Puree", "Stimulants & Spices (misc.)",
+  "Flavoring", "Stimulants & Spices (misc.)",
+
+  
+  # UNKNOWN
+  "Other", NA,
+  "", NA
+
+)
+
+classified <- UCD_H %>%
+  left_join(subcat_dict, by = "env_sub_category")
+
+```
+
+Check coverage
+```{r}
+classified %>%
+  summarise(
+    total = n(),
+    classified = sum(!is.na(SIMAP_cat)),
+    pct_classified = classified / total
+  )
+
+classified_report <- classified %>%
+  filter(is.na(SIMAP_cat)) %>%
+  count(env_sub_category, sort = TRUE)
+
+unclassified_list <- classified %>%
+  filter(is.na(SIMAP_cat))
+
+write.csv(classified_report, "Tests/classified_report.csv", row.names = FALSE)
+write.csv(unclassified_list, "Tests/unclassified_list.csv", row.names = FALSE)
+
+```
+
+# STEP 2: CLASSIFY remaining nas by product name
+
+```{r}
+
+```
+

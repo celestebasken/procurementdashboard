@@ -1,0 +1,33 @@
+title,weight_group_key,assumed_each_weight_oz,assumed_each_weight_lb,assumption_note,source_url,confidence
+Ex-Sour Baguette 16 oz,BAGUETTE_16OZ,16.0,1.0,Used 16 oz baguette weight (explicit for ex-sour; applied same to sweet baguette).,https://www.doordash.com/products/nob-hill-trading-co-sweet-french-baguette-bread-16-oz/urpc_d24a5430-cbb5-4f58-94be-b09b00a0359d,Medium
+Sweet Baguette,BAGUETTE_16OZ,16.0,1.0,Used 16 oz baguette weight (explicit for ex-sour; applied same to sweet baguette).,https://www.doordash.com/products/nob-hill-trading-co-sweet-french-baguette-bread-16-oz/urpc_d24a5430-cbb5-4f58-94be-b09b00a0359d,Medium
+"Briosh 4"" Ham Plain Dz",BRIOCHE_BUN_4IN_3OZ,3.0,0.1875,Used 4-inch brioche bun proxy at 3.0 oz each.,https://www.eurobake.us/all-products/brioche-sandwich-bun---sliced/,Medium
+Briosh 4'' Ham Plain Dz,BRIOCHE_BUN_4IN_3OZ,3.0,0.1875,Used 4-inch brioche bun proxy at 3.0 oz each.,https://www.eurobake.us/all-products/brioche-sandwich-bun---sliced/,Medium
+"Briosh 4.5"" Ham Dz",BRIOCHE_BUN_4P5IN_3P1OZ,3.1,0.19375,Used 4.5-inch brioche bun proxy at 3.1 oz each.,https://www.lantmannenunibake.us/all-products/brioche-bun-4.5-sliced,Medium
+Briosh 4.5'' Ham Dz,BRIOCHE_BUN_4P5IN_3P1OZ,3.1,0.19375,Used 4.5-inch brioche bun proxy at 3.1 oz each.,https://www.lantmannenunibake.us/all-products/brioche-bun-4.5-sliced,Medium
+Club Roll,CLUB_ROLL_3OZ,3.0,0.1875,Used club-roll proxy at 3.0 oz each.,https://www.foodservicedirect.com/gonnella-club-roll-dough-3-ounce-144-per-case-338486.html,Medium
+Croissants Each,CROISSANT_2P5OZ,2.5,0.15625,Used plain croissant proxy at 2.5 oz each.,https://www.food4less.com/p/bakery-fresh-goodness-all-butter-croissant/0001111030106,Medium
+Small Plain Croissant,CROISSANT_2P5OZ,2.5,0.15625,Used plain croissant proxy at 2.5 oz each.,https://www.food4less.com/p/bakery-fresh-goodness-all-butter-croissant/0001111030106,Medium
+4'' Hamburger Plain Dz,HAMBURGER_BUN_4IN_2OZ,2.0,0.125,Used 4-inch plain hamburger-bun proxy at ~55g; rounded to 2.0 oz each.,https://www.schulstadbakerysolutions.com/all-products/hamburger-bun---4-inch-55-g/,Medium
+Sweet 4.5'' Hams 6-Pk,HAMBURGER_BUN_4P5IN_3OZ,3.0,0.1875,Used 4.5-inch plain hamburger-bun proxy at 3.0 oz each.,https://www.foodservicedirect.com/alpha-baking-4-5-inch-potato-hamburger-bun--3-ounce----72-per-case-23004879.html,Low-Medium
+Sweet 5'' Hot Dog Plain,HOT_DOG_BUN_5IN_1P5OZ,1.5,0.09375,Used plain 5-inch hot dog bun proxy at 1.5 oz each.,https://www.foodservicedirect.com/gonnella-baking-company-individually-wrapped-plain-hot-dog-bun--1-5-ounce----56-per-case-21407664.html,Medium
+Sweet 6'' Poorboy,POORBOY_6IN_3OZ,3.0,0.1875,Used 6-inch po' boy roll proxy at 3.0 oz each.,https://www.foodservicedirect.com/gambinos-po-boy-gallagher-bread-3-ounce-50-per-case-21407567.html,Medium
+9- Grain Pullman Sliced,PULLMAN_9GRAIN_36OZ,36.0,2.25,Used 9-grain Pullman loaf proxy at ~36 oz each (Hudson Bread listing weight≈1021g).,https://store.hudsonbread.com/products/n-pullman-9-grain-sliced,Medium
+9-Grain Pullman Sliced,PULLMAN_9GRAIN_36OZ,36.0,2.25,Used 9-grain Pullman loaf proxy at ~36 oz each (Hudson Bread listing weight≈1021g).,https://store.hudsonbread.com/products/n-pullman-9-grain-sliced,Medium
+Sweet Pullman Sliced,PULLMAN_SWEET_24OZ,24.0,1.5,Used standard sliced Pullman loaf proxy at 24 oz each.,https://www.piantedosi.com/wp-content/uploads/upcp-product-file-uploads/C-579%20%28Wheat%20Pullman%20Loaf%29.pdf,Low-Medium
+"9-Grain 6"" Roll Dz",SANDWICH_ROLL_6IN_3OZ,3.0,0.1875,Used 6-inch sandwich/sub-roll proxy at 3.0 oz each for Bordenave 6-inch rolls.,https://anthonyandsonsbakery.com/product/6-sub-roll/,Medium
+"Dutch Crunch 6"" Roll Dz",SANDWICH_ROLL_6IN_3OZ,3.0,0.1875,Used 6-inch sandwich/sub-roll proxy at 3.0 oz each for Bordenave 6-inch rolls.,https://anthonyandsonsbakery.com/product/6-sub-roll/,Medium
+Original 6'' Torpedo Plain Dz,SANDWICH_ROLL_6IN_3OZ,3.0,0.1875,Used 6-inch sandwich/sub-roll proxy at 3.0 oz each for Bordenave 6-inch rolls.,https://anthonyandsonsbakery.com/product/6-sub-roll/,Medium
+"Sweet 6"" Large Roll Dz",SANDWICH_ROLL_6IN_3OZ,3.0,0.1875,Used 6-inch sandwich/sub-roll proxy at 3.0 oz each for Bordenave 6-inch rolls.,https://anthonyandsonsbakery.com/product/6-sub-roll/,Medium
+"Sweet 6"" Large Roll W/ Sesame Dz",SANDWICH_ROLL_6IN_3OZ,3.0,0.1875,Used 6-inch sandwich/sub-roll proxy at 3.0 oz each for Bordenave 6-inch rolls.,https://anthonyandsonsbakery.com/product/6-sub-roll/,Medium
+Sweet 6'' Large Roll Dz,SANDWICH_ROLL_6IN_3OZ,3.0,0.1875,Used 6-inch sandwich/sub-roll proxy at 3.0 oz each for Bordenave 6-inch rolls.,https://anthonyandsonsbakery.com/product/6-sub-roll/,Medium
+"Dutch Crunch 8"" Roll Dz Poly",SANDWICH_ROLL_8IN_4P5OZ,4.5,0.28125,Used 8-inch sandwich/sub-roll proxy at 4.5 oz each for Bordenave 8-inch rolls.,https://anthonyandsonsbakery.com/product/8-sub-roll/,Medium
+Sweet 8'' Roll Dusted Dz,SANDWICH_ROLL_8IN_4P5OZ,4.5,0.28125,Used 8-inch sandwich/sub-roll proxy at 4.5 oz each for Bordenave 8-inch rolls.,https://anthonyandsonsbakery.com/product/8-sub-roll/,Medium
+Briosh 2.5'' Slider 1.3oz Dz,SLIDER_2P5IN_1P3OZ,1.3,0.08125,Used explicit 1.3 oz from item title / matching slider spec.,https://www.piantedosi.com/wp-content/uploads/upcp-product-file-uploads/C-1202%20Brioche%20Slider.pdf,High
+Sour Small Round Roll Dz,SMALL_ROUND_ROLL_1P5OZ,1.5,0.09375,Used small dinner-roll proxy at 1.5 oz each for Bordenave sour/sweet/wheat small round rolls.,https://www.richsusa.com/products/breads-rolls/rolls-dough/03236/,Medium
+Sweet Small Round Roll Dz,SMALL_ROUND_ROLL_1P5OZ,1.5,0.09375,Used small dinner-roll proxy at 1.5 oz each for Bordenave sour/sweet/wheat small round rolls.,https://www.richsusa.com/products/breads-rolls/rolls-dough/03236/,Medium
+Sweet Small Round Roll Seed Dz,SMALL_ROUND_ROLL_1P5OZ,1.5,0.09375,Used small dinner-roll proxy at 1.5 oz each for Bordenave sour/sweet/wheat small round rolls.,https://www.richsusa.com/products/breads-rolls/rolls-dough/03236/,Medium
+Whole Wheat Small Round Roll Dz,SMALL_ROUND_ROLL_1P5OZ,1.5,0.09375,Used small dinner-roll proxy at 1.5 oz each for Bordenave sour/sweet/wheat small round rolls.,https://www.richsusa.com/products/breads-rolls/rolls-dough/03236/,Medium
+"Sour 2# Vienna 3/4"" Sliced",VIENNA_LOAF_2LB,32.0,2.0,Used explicit 2# in title = 2 lb loaf.,https://bordenavesbakery.com/pages/sliced-loaves,High
+Sour 2# Vienna 3/4'' Sliced,VIENNA_LOAF_2LB,32.0,2.0,Used explicit 2# in title = 2 lb loaf.,https://bordenavesbakery.com/pages/sliced-loaves,High
+Whole Wheat 2# Vienna Sliced No Oats,WHOLE_WHEAT_VIENNA_2LB,32.0,2.0,Used explicit 2# in title = 2 lb loaf.,https://bordenavesbakery.com/pages/sliced-loaves,High
