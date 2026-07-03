@@ -32,6 +32,7 @@ pycparser==3.0
 pydeck==0.9.2
 pydyf==0.12.1
 pyphen==0.17.2
+pytest==9.1.1
 python-dateutil==2.9.0.post0
 python-multipart==0.0.32
 RapidFuzz==3.14.5

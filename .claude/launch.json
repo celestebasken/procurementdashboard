@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "entity-match-review",
+      "runtimeExecutable": "venv/bin/streamlit",
+      "runtimeArgs": ["run", "app/Entity_Match_Review.py", "--server.headless", "true"],
+      "port": 8501
+    }
+  ]
+}

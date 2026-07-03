@@ -37,4 +37,4 @@ This repo is public, but the underlying campus purchasing data is not — `data/
 
 ## Status
 
-Currently in Phase 1: building the canonical data ingestion pipeline. See the Build Phases section in `CLAUDE.md` for the full roadmap.
+Phases 1–3 built: ingestion pipeline (incl. water non-food filter), within- and cross-campus entity resolution (human review queue at `app/Entity_Match_Review.py`; cross-campus built but not yet run against live data), and SIMAP-57 classification (~90% coverage). **Currently mid-cleanup**: a data-integrity issue was found in 24 already-merged products (see CLAUDE.md's "Current status" section for the full handoff) — re-derivation from raw data is the next step before resuming manual review or moving to Phase 4. See the Build Phases section in `CLAUDE.md` for the full roadmap.
