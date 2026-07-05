@@ -98,6 +98,34 @@ def test_keyword_match_returns_none_when_nothing_matches():
     assert keyword_match("NAPKIN DISPENSER WHITE", d) is None
 
 
+def test_keyword_match_handles_irregular_consonant_y_plural():
+    # "Berry"/"Cherry" -> "Berries"/"Cherries", not "Berrys"/"Cherrys" --
+    # the regular "s?" suffix alone misses this. Real products recovered:
+    # "CHERRIES MARASCHINO...", "OG1 KAMUT BERRIES", "SNR BLACKBERRIES...".
+    d = {"Berry": "Berries", "Cherry": "Fruits (misc.)"}
+    assert keyword_match("OG1 KAMUT BERRIES", d) == "Berries"
+    assert keyword_match("CHERRIES MARASCHINO WITH STEM", d) == "Fruits (misc.)"
+    assert keyword_match("SINGLE BERRY PARFAIT", d) == "Berries"  # singular still matches
+
+
+def test_keyword_match_does_not_pluralize_vowel_y_as_ies():
+    # "Soy" ends in vowel+y -- must NOT become "Soies"; only the regular
+    # optional "s" suffix applies here.
+    d = {"Soy": "Soybeans/Tofu"}
+    assert keyword_match("SOY SAUCE LOW SODIUM", d) == "Soybeans/Tofu"
+    assert keyword_match("SOIES FABRIC SAMPLE", d) is None
+
+
+def test_keyword_match_handles_o_ending_irregular_plural():
+    # "Tomato"/"Potato" -> "Tomatoes"/"Potatoes", not "Tomatos"/"Potatos" --
+    # no reliable rule distinguishes "+s" vs "+es" for o-ending words, so
+    # both forms are accepted.
+    d = {"Tomato": "Tomatoes", "Potato": "Potatoes"}
+    assert keyword_match("SNR TOMATOES DICED 1/4 2/5LB", d) == "Tomatoes"
+    assert keyword_match("POTATOES RED B 50 LBS", d) == "Potatoes"
+    assert keyword_match("TOMATO PASTE FANCY CA", d) == "Tomatoes"  # singular still matches
+
+
 # --------------------------------------------------------------------------
 # build_campus_category_lookup
 # --------------------------------------------------------------------------

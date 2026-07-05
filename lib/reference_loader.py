@@ -57,6 +57,12 @@ def load_simap_taxonomy(
     conn: sqlite3.Connection, path: Path = REFERENCE_DIR / "simap_categories.csv"
 ) -> int:
     df = pd.read_csv(path)
+    # Real bug: some rows in simap_categories.csv have trailing whitespace on
+    # "Food Category" (e.g. "Citrus Fruit ", "Corn (Maize) "), which silently
+    # broke the join against products.simap_category (clean, no whitespace)
+    # for every product in those categories -- they got no GHG factor at all.
+    df["Food Category"] = df["Food Category"].str.strip()
+    df["Meat type"] = df["Meat type"].apply(lambda v: v if pd.isna(v) else str(v).strip())
 
     dupes = df[df["Food Category"].duplicated(keep=False)]
     if not dupes.empty:
@@ -98,11 +104,24 @@ def load_simap_taxonomy(
     return len(rows)
 
 
+def load_food_groups(conn: sqlite3.Connection, path: Path = REFERENCE_DIR / "food_groups.csv") -> int:
+    df = pd.read_csv(path)
+    rows = [(r["simap_category"], r["food_group"]) for _, r in df.iterrows()]
+    conn.execute("DELETE FROM food_groups")
+    conn.executemany(
+        "INSERT INTO food_groups (simap_category, food_group) VALUES (?, ?)",
+        rows,
+    )
+    conn.commit()
+    return len(rows)
+
+
 def load_all(conn: sqlite3.Connection) -> dict:
     return {
         "campuses": load_campuses(conn),
         "certification_types": load_certification_types(conn),
         "simap_taxonomy": load_simap_taxonomy(conn),
+        "food_groups": load_food_groups(conn),
     }
 
 

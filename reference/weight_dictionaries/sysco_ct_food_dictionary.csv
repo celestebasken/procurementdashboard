@@ -1,0 +1,25 @@
+pattern,weight_group_key,reference_weight_lb,formula,assumption_note,source_url,confidence,human_confirmed
+EGG HARDCOOKED|EGG HARD COOKED|EGG HARD CKD,HARDCOOKED_EGG_1P75OZ,0.109375,multiply,"Standard large hard-cooked/peeled egg -- ~1.75 oz each, matching the explicit-oz stated on other Sysco egg SKUs in this same export. ""CKD"" (UC Riverside's abbreviation for ""cooked"") added after finding ""EGG HARD CKD CAGEFREE 12/12CT"" didn't match the original spelled-out patterns.",,Medium,0
+SPRINGROLL VEGETABLE,SPRINGROLL_VEG_1P5OZ,0.09375,multiply,"Matches the explicit 1.5 oz stated on the sibling SKU ""SPRINGROLL VEG 1.5 OZ"" in this same export -- same item, just missing the explicit oz in the name.",,Medium,0
+ROLL DINNER HAWAIIAN,HAWAIIAN_ROLL_1P5OZ,0.09375,multiply,"Standard Hawaiian sweet dinner roll -- ~1.5 oz each.",,Low-Medium,0
+TORTILLA.*6(?:\s?IN\b|"|”)|TORTILLA FLOUR PRESS 6IN,TORTILLA_6IN_1OZ,0.0625,multiply,"6-inch flour tortilla (taco size) -- ~1 oz each. Matches both the spelled-out ""6IN"" (UCB) and the inch-quote symbol ""6\"""" (UCR) -- a real gap found when ""TORTILLA FLOUR 6"" ROMERO 8/36CT"" didn't match the original IN-only pattern.",,Low-Medium,0
+TORTILLA.*12(?:\s?IN\b|"|”),TORTILLA_12IN_3OZ,0.1875,multiply,"12-inch flour tortilla (wrap size, whether branded ""WRAP"" or a plain wheat/tomato-basil/etc. tortilla of the same size) -- ~3 oz each. Matches both ""IN"" and the inch-quote symbol -- real gap found when ""TORTILLA WHEAT 12\"""" LA BANDERITA 6/12CT"" (no ""WRAP"" in the name at all) didn't match the original WRAP-anchored pattern.",,Low-Medium,0
+TORTILLA.*13(?:\s?IN\b|"|”),TORTILLA_13IN_3P5OZ,0.21875,multiply,"13-inch large flour tortilla (burrito size) -- ~3.5 oz each. Matches both ""IN"" and the inch-quote symbol.",,Low-Medium,0
+TORTILLA.*14(?:\s?IN\b|"|”),TORTILLA_14IN_4P5OZ,0.28125,multiply,"14-inch extra-large flour tortilla -- ~4.5 oz each. Matches both ""IN"" and the inch-quote symbol.",,Low-Medium,0
+TORTILLA.*10(?:\s?IN\b|"|”),TORTILLA_10IN_2OZ,0.125,multiply,"10-inch flour tortilla (standard burrito size) -- ~2 oz each. Matches both ""IN"" and the inch-quote symbol.",,Low-Medium,0
+TORTILLA.*8(?:\s?IN\b|"|”),TORTILLA_8IN_1P5OZ,0.09375,multiply,"8-inch flour tortilla -- ~1.5 oz each. Matches both ""IN"" and the inch-quote symbol.",,Low-Medium,0
+TORTILLA CORN,TORTILLA_CORN_1OZ,0.0625,multiply,"Corn tortilla -- smaller/lighter than flour, ~1 oz each.",,Low-Medium,0
+BUN HOT DOG|HOT DOG BUN,HOT_DOG_BUN_1P5OZ,0.09375,multiply,"Standard hot dog bun -- ~1.5 oz each (same proxy used elsewhere in this project for hot dog buns). ""HOT DOG BUN"" (reversed word order) added after finding ""AVB HOT DOG BUNS 6"""" didn't match the original ""BUN HOT DOG"" order.",,Medium,0
+BUN HAMBURGER,HAMBURGER_BUN_2P5OZ,0.15625,multiply,"Standard hamburger bun -- ~2.5 oz each (same proxy used elsewhere in this project for hamburger buns).",,Medium,0
+BUN BRIOCHE.*MINI,BRIOCHE_MINI_1OZ,0.0625,multiply,"Mini brioche slider bun -- ~1 oz each.",,Low-Medium,0
+CORN COB PETITE,CORN_COBETTE_2P5OZ,0.15625,multiply,"Petite corn cob -- much smaller than a full ear, ~2.5 oz each (same proxy as the Daylight Foods ""cobette"" entry).",,Low-Medium,0
+APTZR POTSTICKER,POTSTICKER_0P7OZ,0.04375,multiply,"Standard appetizer potsticker -- ~0.7 oz each.",,Low-Medium,0
+PASTRY CREAM PUFF.*MINI,CREAM_PUFF_MINI_1OZ,0.0625,multiply,"Mini cream puff pastry -- ~1 oz each.",,Low-Medium,0
+APTZR.*EMPANADA,EMPANADA_3OZ,0.1875,multiply,"Standard appetizer empanada -- ~3 oz each.",,Low-Medium,0
+OLIVE BLACK RIPE SLICED,SLICED_OLIVE_CAN_14OZ,0.875,multiply,"""10 CT"" here means cans/jars of sliced olives per case, not individual olives -- a standard sliced-olive can runs ~14 oz.",,Low-Medium,0
+BAKLAVA,BAKLAVA_PIECE_1P5OZ,0.09375,multiply,"Standard baklava piece -- ~1.5 oz each.",,Low-Medium,0
+BREAD PITA,PITA_BREAD_2OZ,0.125,multiply,"Standard pita bread -- ~2 oz each.",,Low-Medium,0
+COOKIE MINI.*MACARON,MINI_MACARON_0P5OZ,0.03125,multiply,"Mini macaron cookie -- ~0.5 oz each.",,Low-Medium,0
+MUFFIN ENGLISH,ENGLISH_MUFFIN_2P17OZ,0.13541666666666666,multiply,"Standard English muffin -- ~2.17 oz each (same real stated-pack-weight-derived proxy used for Bimbo Bakery's English muffins in this project).",,Medium,0
+BROWNIE.*BITES,BROWNIE_BITE_0P5OZ,0.03125,multiply,"Bite-size brownie piece -- ~0.5 oz each.",,Low-Medium,0
+BREAD FLAT.*LAVASH,LAVASH_FLATBREAD_8OZ,0.5,multiply,"Large lavash flatbread sheet (11x17 in) -- ~8 oz each, notably bigger than a standard pita.",,Low-Medium,0

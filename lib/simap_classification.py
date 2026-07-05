@@ -105,15 +105,37 @@ def build_campus_category_lookup(campus_abbrev: str, data_dir: Path = DATA_RAW_D
 _WORD_RE_CACHE: dict[str, re.Pattern] = {}
 
 
+_CONSONANT_Y_RE = re.compile(r"[^aeiouAEIOU]y$")
+
+
 def _keyword_pattern(keyword: str) -> re.Pattern:
     if keyword not in _WORD_RE_CACHE:
         # Trailing "s" optional so a singular dictionary entry ("Grape")
         # also matches the plural product name ("GRAPES") -- auditing real
         # output found ~660 otherwise-unclassified products this recovers
-        # (chips, cookies, muffins, waffles, seeds, ...). Only covers the
-        # simple English plural, not irregular forms (berry/berries) -- an
-        # honest partial improvement, not a full stemmer.
-        _WORD_RE_CACHE[keyword] = re.compile(r"\b" + re.escape(keyword) + r"s?\b", re.IGNORECASE)
+        # (chips, cookies, muffins, waffles, seeds, ...).
+        escaped = re.escape(keyword)
+        if _CONSONANT_Y_RE.search(keyword):
+            # Irregular "consonant+y -> ies" plural (e.g. "Berry" ->
+            # "Berries", "Cherry" -> "Cherries") -- the simple "s?" suffix
+            # alone doesn't cover this. Found via real audit: 17
+            # unclassified products recovered by this alone (CHERRIES,
+            # STRAWBERRIES, BLUEBERRIES, BLACKBERRIES, RASPBERRIES, KAMUT
+            # BERRIES), not guessed -- an honest partial improvement (this
+            # one irregular pattern), not a full stemmer.
+            ies_form = re.escape(keyword[:-1]) + "ies"
+            pattern = r"\b(?:" + escaped + r"s?|" + ies_form + r")\b"
+        elif keyword.endswith("o"):
+            # Same idea for words ending in "o": some pluralize "+s"
+            # (avocado -> avocados), others "+es" (tomato -> tomatoes,
+            # potato -> potatoes) -- no reliable rule distinguishes them, so
+            # accept either form rather than guess which one a given word
+            # uses. Found via real audit: 19 unclassified products
+            # recovered (TOMATOES, POTATOES, MANGOES).
+            pattern = r"\b" + escaped + r"e?s?\b"
+        else:
+            pattern = r"\b" + escaped + r"s?\b"
+        _WORD_RE_CACHE[keyword] = re.compile(pattern, re.IGNORECASE)
     return _WORD_RE_CACHE[keyword]
 
 

@@ -1,0 +1,35 @@
+pattern,weight_group_key,reference_weight_lb,formula,assumption_note,source_url,confidence,human_confirmed
+AVOCADO.*2-LYR,AVOCADO_25LB_FLAT,25.0,case,"Standard Hass avocado ""2-layer"" flat is a well-established produce industry carton size at ~25 lb net -- the count/size grade in the name (e.g. ""(48)"", ""(60)"") describes how big the individual avocados are, not how much the flat weighs, so it's NOT a divisor: every 2-layer flat is treated as ~25 lb regardless of grade.",,Medium,0
+"ORANGE, NAVEL|ORANGE, VALENCIA",CITRUS_ORANGE_37P5LB_CARTON,37.5,case,"Standard citrus (navel/valencia orange) shipping carton runs ~37.5 lb net, regardless of the count/size grade in the name (e.g. ""(88)"", ""(113)"", ""(138)"") -- that code describes piece size, not case weight.",,Medium,0
+GRAPEFRUIT,CITRUS_GRAPEFRUIT_40LB_CARTON,40.0,case,"Standard grapefruit shipping carton runs slightly heavier than orange, ~40 lb net, regardless of the count/size grade.",,Low-Medium,0
+LEMON,CITRUS_LEMON_38LB_CARTON,38.0,case,"Standard lemon shipping carton runs ~38 lb net, regardless of the count/size grade.",,Low-Medium,0
+LIME,CITRUS_LIME_40LB_CARTON,40.0,case,"Standard lime shipping carton runs ~40 lb net, regardless of the count/size grade.",,Low-Medium,0
+APPLE,APPLE_40LB_CARTON,40.0,case,"Standard US apple shipping carton is a well-established produce industry size at 40 lb net, regardless of the count/size grade in the name (e.g. ""64-88 CT""). Real bug caught and fixed here: an earlier version divided 40 lb by the count, which is backwards -- a standard carton weighs ~the same no matter what size grade of apple is inside (that's the point of a standard carton) -- and additionally mis-parsed a ""80/88ct"" grade code (slash-separated) as a multiply-chain (80x88) instead of a size-grade pair, compounding into a $4,153/lb result for one row before the fix.",,Medium,0
+PEAR,PEAR_44LB_CARTON,44.0,case,"Standard Western pear (Bosc/D'Anjou/Bartlett) shipping box runs ~44 lb net, regardless of the count/size grade.",,Medium,0
+BROCCOLINI,BROCCOLINI_BUNCH_0P5LB,0.5,multiply,"A standard broccolini bunch -- ~0.5 lb each.",,Low-Medium,0
+"CUCUMBER, ENGLISH",CUCUMBER_ENGLISH_0P75LB,0.75,multiply,"English (seedless) cucumbers run larger/heavier than standard slicers -- ~0.75 lb each. Checked before the bare CUCUMBER pattern below.",,Low-Medium,0
+CUCUMBER,CUCUMBER_0P66LB,0.66,multiply,"Standard slicer cucumber -- ~0.66 lb (300g) each.",,Low-Medium,0
+"TOMATO, CHERRY",CHERRY_TOMATO_PINT_0P656LB,0.656,multiply,"""-CT"" here means pint containers per case, not individual cherry tomatoes -- a standard pint of cherry tomatoes runs ~10.5 oz.",,Low-Medium,0
+"ROMAINE, HEARTS",ROMAINE_HEART_0P5LB,0.5,multiply,"A trimmed romaine heart (not a whole head) runs ~0.5 lb -- checked before the bare ROMAINE pattern below. Count often a chain (e.g. ""12/3-CT"" = 12 bags of 3 hearts = 36 hearts).",,Low-Medium,0
+ROMAINE,ROMAINE_HEAD_1LB,1.0,multiply,"A whole (untrimmed) romaine head runs heavier than a trimmed heart -- ~1.0 lb.",,Low-Medium,0
+NAAN,NAAN_3OZ,0.1875,multiply,"Standard naan flatbread piece -- ~3 oz each. Count often a chain (e.g. ""4/8-CT"" = 4 packs of 8 pieces).",,Low-Medium,0
+BLUEBERRY,BLUEBERRY_PINT_0P6875LB,0.6875,multiply,"""-CT"" here means pint/clamshell containers per case -- a standard blueberry pint/clamshell runs ~11 oz.",,Low-Medium,0
+EGGPLANT,EGGPLANT_0P75LB,0.75,multiply,"Standard globe eggplant -- ~0.75 lb each.",,Low-Medium,0
+"CORN, SHUCKED COBETTES",CORN_COBETTE_2P5OZ,0.15625,multiply,"A ""cobette"" (mini corn cob) is much smaller than a full ear -- ~2.5 oz each.",,Low-Medium,0
+RASPBERRY|BLACKBERRY,BERRY_HALFPINT_6OZ,0.375,multiply,"""-CT"" here means half-pint/clamshell containers per case -- a standard raspberry/blackberry half-pint runs ~6 oz.",,Low-Medium,0
+PINEAPPLE,PINEAPPLE_2P5LB,2.5,multiply,"A whole fresh pineapple runs roughly 2-4 lb -- used the midpoint, ~2.5 lb each.",,Low-Medium,0
+MILK.*HALF PINT|MILK.*HPT,MILK_HALFPINT_1P075LB,1.075,multiply,"A standard dairy half-pint container -- ~1.075 lb (dairy density ~8.6 lb/gal / 8 half-pints per gal).",,Medium,0
+ENDIVE|FRISEE,ENDIVE_0P5LB,0.5,multiply,"A whole endive/frisee head -- ~0.5 lb each.",,Low-Medium,0
+KIWI,KIWI_0P25LB,0.25,multiply,"A standard kiwi fruit -- ~0.25 lb (4 oz) each.",,Low-Medium,0
+CANTALOUPE,CANTALOUPE_3LB,3.0,multiply,"A whole cantaloupe (9-count case = a mid-size melon) -- ~3.0 lb each.",,Low-Medium,0
+HONEYDEW,HONEYDEW_5LB,5.0,multiply,"A whole honeydew melon runs larger than cantaloupe (4-6 count case = a large melon) -- ~5.0 lb each.",,Low-Medium,0
+HERB,HERB_BUNCH_0P15LB,0.15,multiply,"A standard fresh herb bunch (cilantro, parsley, etc.) -- ~0.15 lb (2.4 oz) each.",,Low-Medium,0
+CELERY,CELERY_BUNCH_1P5LB,1.5,multiply,"A whole celery bunch -- ~1.5 lb.",,Low-Medium,0
+NECTARINE|PEACH,STONEFRUIT_0P23LB,0.23,multiply,"Standard stone fruit (peach/nectarine) -- ~0.23 lb (3.7 oz) each, consistent with a ~25 lb carton at a ~108-count size grade. The count here is a bare number right before ""CT"" (e.g. ""108-CT"") -- an earlier hyphenated size-grade code in the same name (e.g. ""72-SZ"") is NOT part of the count and is correctly ignored since it isn't adjacent to ""CT"".",,Low-Medium,0
+PLUMS,PLUM_0P233LB,0.233,multiply,"Standard plum -- ~0.233 lb (3.7 oz) each, consistent with a ~28 lb carton at a ~120-count size grade.",,Low-Medium,0
+LETTUCE,LETTUCE_HEAD_0P75LB,0.75,multiply,"A whole lettuce head (green leaf, iceberg, etc.) -- ~0.75 lb each.",,Low-Medium,0
+BANANA,BANANA_PETITE_0P2LB,0.2,multiply,"A petite/mini banana runs smaller than standard -- ~0.2 lb (3.2 oz) each.",,Low-Medium,0
+CAULIFLOWER,CAULIFLOWER_HEAD_2LB,2.0,multiply,"A whole cauliflower head -- ~2.0 lb each.",,Low-Medium,0
+FENNEL,FENNEL_BULB_0P75LB,0.75,multiply,"A whole fennel bulb -- ~0.75 lb each.",,Low-Medium,0
+MANGO,MANGO_0P75LB,0.75,multiply,"A standard mango -- ~0.75 lb each.",,Low-Medium,0
+KALE,KALE_BUNCH_0P75LB,0.75,multiply,"A standard kale bunch -- ~0.75 lb.",,Low-Medium,0

@@ -34,6 +34,16 @@ CREATE TABLE IF NOT EXISTS simap_taxonomy (
     truck_capacity_kg REAL
 );
 
+-- Groups SIMAP-57 categories into culinary-substitute umbrellas (e.g. beef,
+-- poultry, and tofu are all "Protein") for lib.optimization's per-group
+-- fixed-weight constraints -- keeps the optimizer from "substituting" a
+-- protein cut for something unrelated like apples. Reference/config data,
+-- not derived -- see reference/food_groups.csv and lib.reference_loader.
+CREATE TABLE IF NOT EXISTS food_groups (
+    simap_category TEXT PRIMARY KEY,
+    food_group TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS certification_types (
     certification_name TEXT PRIMARY KEY,
     abbreviation TEXT,
