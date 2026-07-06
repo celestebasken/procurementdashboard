@@ -6,10 +6,12 @@ import pandas as pd
 
 from lib.db import init_db
 from lib.optimization import (
+    HypotheticalItem,
     InfeasibleScenarioError,
     build_category_baseline,
     identify_category_movers,
     solve_cost_target_then_maximize,
+    solve_hypothetical_item_check,
     solve_max_sustainable_keep_cost,
     solve_min_spend_keep_sustainability,
     solve_threshold_third_of_scenario1,
@@ -446,3 +448,119 @@ def test_identify_category_movers_flags_cost_neutral_vs_premium():
 
     assert chicken["price_ratio_sus_to_conv"] == pytest.approx(2.0)
     assert not chicken["cost_neutral_or_better"]
+
+
+# --------------------------------------------------------------------------
+# solve_hypothetical_item_check (Phase 8: Competitive Price Checker)
+# --------------------------------------------------------------------------
+
+def _beef_row(result):
+    return result.category_results[result.category_results["simap_category"] == "Beef & buffalo meat"].iloc[0]
+
+
+def test_solve_hypothetical_item_check_adopts_a_cheap_sustainable_item(conn):
+    # Fixture: beef sustainable=$7/lb, conventional=$5/lb. A $3/lb
+    # sustainable hypothetical beats both -- a real "free win" the solver
+    # should choose, up to its supply cap.
+    baseline = _two_category_baseline(conn)
+    hypothetical = HypotheticalItem(
+        simap_category="Beef & buffalo meat", price_per_lb=3.0, max_weight_lbs=50.0, is_sustainable=True
+    )
+    result = solve_hypothetical_item_check(baseline, hypothetical, cost_reduction_target=0.0)
+
+    beef = _beef_row(result)
+    assert beef["hypothetical_weight_lbs"] == pytest.approx(50.0)
+    # Adopting it shouldn't blow the cost cap (this scenario's whole point).
+    # A slightly looser tolerance than other assertions in this file -- the
+    # extra hypothetical decision variable gives the solver one more degree
+    # of freedom, which shows up as marginally more floating-point noise.
+    assert result.totals["optimized_cost"] <= result.totals["baseline_cost"] + 1e-3
+
+
+def test_solve_hypothetical_item_check_rejects_an_overpriced_item(conn):
+    baseline = _two_category_baseline(conn)
+    hypothetical = HypotheticalItem(
+        simap_category="Beef & buffalo meat", price_per_lb=50.0, max_weight_lbs=50.0, is_sustainable=True
+    )
+    result = solve_hypothetical_item_check(baseline, hypothetical, cost_reduction_target=0.0)
+
+    beef = _beef_row(result)
+    assert beef["hypothetical_weight_lbs"] == pytest.approx(0.0)
+
+
+def test_solve_hypothetical_item_check_respects_the_supply_cap(conn):
+    # Same cheap, clearly-worth-adopting price as the "adopts" test above,
+    # but a much smaller cap -- the solver should max it out at the cap,
+    # not silently ignore the cap because the price is attractive.
+    baseline = _two_category_baseline(conn)
+    hypothetical = HypotheticalItem(
+        simap_category="Beef & buffalo meat", price_per_lb=3.0, max_weight_lbs=5.0, is_sustainable=True
+    )
+    result = solve_hypothetical_item_check(baseline, hypothetical, cost_reduction_target=0.0)
+
+    beef = _beef_row(result)
+    assert beef["hypothetical_weight_lbs"] == pytest.approx(5.0)
+
+
+def test_solve_hypothetical_item_check_max_weight_lbs_defaults_to_uncapped(conn):
+    # max_weight_lbs omitted entirely (the new optional default) -- the
+    # hypothetical should be limited only by the category's own +/-15%
+    # band (200 baseline * 1.15 = 230), not an arbitrary supply number.
+    baseline = _two_category_baseline(conn)
+    hypothetical = HypotheticalItem(simap_category="Beef & buffalo meat", price_per_lb=3.0, is_sustainable=True)
+    result = solve_hypothetical_item_check(baseline, hypothetical, cost_reduction_target=0.0)
+
+    beef = _beef_row(result)
+    assert beef["optimized_weight_lbs"] == pytest.approx(230.0)
+
+
+def test_solve_hypothetical_item_check_preserves_global_fixed_total_weight(conn):
+    # Injecting a hypothetical must still respect Tier 1 (global exact
+    # fixed total weight) -- it's a new SOURCE of a category's weight, not
+    # extra weight on top of what the campus already buys.
+    baseline = _two_category_baseline(conn)
+    hypothetical = HypotheticalItem(
+        simap_category="Beef & buffalo meat", price_per_lb=3.0, max_weight_lbs=50.0, is_sustainable=True
+    )
+    result = solve_hypothetical_item_check(baseline, hypothetical, cost_reduction_target=0.0)
+
+    assert result.category_results["optimized_weight_lbs"].sum() == pytest.approx(
+        baseline["baseline_weight_lbs"].sum()
+    )
+
+
+def test_solve_hypothetical_item_check_raises_for_category_with_no_baseline_weight(conn):
+    baseline = _two_category_baseline(conn)
+    hypothetical = HypotheticalItem(
+        simap_category="Apples", price_per_lb=1.0, max_weight_lbs=10.0, is_sustainable=True
+    )
+    with pytest.raises(ValueError):
+        solve_hypothetical_item_check(baseline, hypothetical)
+
+
+def test_solve_hypothetical_item_check_raises_for_unknown_category(conn):
+    baseline = _two_category_baseline(conn)
+    hypothetical = HypotheticalItem(
+        simap_category="Not A Real Category", price_per_lb=1.0, max_weight_lbs=10.0, is_sustainable=True
+    )
+    with pytest.raises(ValueError):
+        solve_hypothetical_item_check(baseline, hypothetical)
+
+
+def test_solve_hypothetical_item_check_conventional_claim_does_not_count_as_sustainable_spend(conn):
+    # A hypothetical explicitly claimed as conventional (is_sustainable=False)
+    # must never inflate optimized_sustainable_spend even if adopted --
+    # the claim is taken at face value, never re-derived from price alone.
+    baseline = _two_category_baseline(conn)
+    hypothetical = HypotheticalItem(
+        simap_category="Beef & buffalo meat", price_per_lb=3.0, max_weight_lbs=50.0, is_sustainable=False
+    )
+    result = solve_hypothetical_item_check(baseline, hypothetical, cost_reduction_target=0.0)
+
+    beef = _beef_row(result)
+    assert beef["hypothetical_weight_lbs"] > 0  # confirms it WAS adopted (cheapest option available)
+    # Sustainable spend must come entirely from the existing sustainable
+    # sub-split's own weight -- the hypothetical's dollars, however much
+    # was adopted, are excluded since it's claimed conventional.
+    sustainable_weight_only = beef["optimized_sustainable_spend"] / beef["sustainable_price_per_lb"]
+    assert sustainable_weight_only <= beef["optimized_weight_lbs"] - beef["hypothetical_weight_lbs"] + 1e-6

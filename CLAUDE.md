@@ -16,21 +16,32 @@ A single, multi-tab Streamlit dashboard consolidating four previously separate t
 ## Repo structure
 
 ```
-app/            Streamlit pages (one multi-tab app, not separate apps)
-lib/            Shared engines: ingestion, matching, classification, optimization, pdf_report, db, weight_lookup/
+app/            Streamlit pages -- currently 5 standalone pages (own port each, see .claude/launch.json),
+                not yet consolidated into one multi-page app, but all share st.session_state["selected_campus"]
+                so they're ready to be once a shared shell exists:
+  1_Campus_Roadmap.py            Phase 5 -- optimization scenarios + PDF report
+  2_Dining_Dashboard.py          Phase 6 -- cross-campus sustainable-product search
+  3_Auto_Classifier.py           Phase 7 -- upload-and-annotate, read-only
+  4_Competitive_Price_Checker.py Phase 8 -- hypothetical-item re-optimization test
+  Entity_Match_Review.py         Phase 2 -- human review queue for entity resolution
+lib/            Shared engines: ingestion, entity_matching, simap_classification, optimization,
+                pdf_report, dining_dashboard, auto_classifier, db, reference_loader, weight_lookup/
 legacy/         Existing R and Python code — read for logic, don't run as-is
-  optimization/       existing R lpSolve code
+  optimization/       existing R lpSolve code (see "Hypothetical Proteins" -> Phase 8's HypotheticalItem)
   dining_dashboard/   existing Python dashboard
   cleaning_scripts/   existing R cleaning/prep scripts
 reference/      Static lookup/config data — rules that don't change per campus or per upload
-  simap_categories.csv        57 SIMAP categories + GHG/nitrogen/transport factors
+  simap_categories.csv        SIMAP-57 categories + GHG/nitrogen/transport factors (55 data rows currently)
+  food_groups.csv             SIMAP category -> culinary-substitution "food group" umbrella (see Optimization engine section)
   certification_types.csv     53 certifications: certification_name, abbreviation, frameworks (multi-value), qualifier, needs_review
   campus_types.csv             all UC campuses: Campus, Primary_standard, Campus_type (Academic/Health), abbreviation (matches data/raw/ filenames)
   weight_dictionaries/         reference-item weight table (e.g. "1 bagel = X lbs") — Tier 3 fallback, populated incrementally via AI + human review, not raw distributor files
+  Brief_guide_on_UC_Sustainable_Purchasing.pdf   downloadable guide, served by the Dining Dashboard's About section
 data/
   raw/          7 campus purchasing exports (sustainable & conventional combined per campus, FY2025) — untouched, exactly as received
   processed/    pipeline output only — never hand-edited
-tests/
+tests/          260 tests across ingestion, entity_matching, simap_classification, reference_loader,
+                optimization, pdf_report, dining_dashboard, auto_classifier
 venv/           local only, gitignored
 ```
 
@@ -86,6 +97,8 @@ SQLite. Core tables:
 
 **`simap_taxonomy`** — loaded from `reference/simap_categories.csv`, all 56 categories including GHG/nitrogen/transport factors, not just category names. **Used for category grouping and GHG-equivalent reporting — never as the definition of "sustainable" in any optimization objective.** The optimizer's sustainability objective always means `products.validated_sustainable_yn` (AASHE STARS / Practice Greenhealth), reported alongside — not instead of — the SIMAP-based emissions figures.
 
+**`food_groups`** — loaded from `reference/food_groups.csv` (Phase 4). `simap_category, food_group` — groups SIMAP categories into culinary-substitution umbrellas (e.g. beef/poultry/pork/fish/tofu/legumes are all "Protein") purely for the optimizer's reallocation bounds, not a reclassification of SIMAP itself. See "Optimization engine" below for how this is used and why Cheese/Yogurt/Ice cream ended up as their own singleton groups rather than folded into a generic "Dairy" group. A SIMAP category missing from this file falls back to being its own singleton group at query time rather than crashing (`lib.optimization.build_category_baseline`).
+
 **`campuses`** — loaded from `reference/campus_types.csv`. Includes all UC campuses, not just the 7 with current purchasing data (schema should tolerate a campus with zero `purchases` rows). `campus_type` determines which certification framework applies during validation (Academic → AASHE STARS, Health → Practice Greenhealth).
 
 ## Ingestion pipeline — distinct steps, in order
@@ -98,9 +111,15 @@ SQLite. Core tables:
 
 ## Front end
 
-One Streamlit app, multi-tab (`app/1_..._Roadmap.py`, `2_..._Dashboard.py`, etc.) — one URL, shared session state, not separate apps.
+Designed as one Streamlit app, multi-tab (`app/1_..._Roadmap.py`, `2_..._Dashboard.py`, etc.) — one URL, shared session state, not separate apps. **Current reality: each page is still standalone** (its own `streamlit run`, own port — see `.claude/launch.json`, ports 8501-8505), since a real multi-page shell hasn't been built yet. All 4 dashboard pages already read/write the same `st.session_state["selected_campus"]` key, so consolidating them later is mechanical, not a redesign.
 
-**Global campus dropdown** in session state filters every tab by campus, feeding the same shared optimization function (campus as a parameter — not per-campus copies of the function). **Exception:** the Dining Dashboard tab is inherently cross-campus (its purpose is discovering what *other* campuses buy) — the dropdown there sets "my campus" as a reference point rather than hard-filtering results, and is also used to highlight/star search results available through a vendor the selected campus already uses (a query-time join against `purchases.vendor`, no schema change needed).
+- `app/1_Campus_Roadmap.py` (Phase 5) — the 3 optimization scenarios + PDF report.
+- `app/2_Dining_Dashboard.py` (Phase 6) — cross-campus sustainable-product search.
+- `app/3_Auto_Classifier.py` (Phase 7) — upload-and-annotate, read-only.
+- `app/4_Competitive_Price_Checker.py` (Phase 8) — hypothetical-item re-optimization test.
+- `app/Entity_Match_Review.py` (Phase 2) — the entity-resolution human review queue.
+
+**Global campus dropdown** in session state filters every tab by campus, feeding the same shared optimization function (campus as a parameter — not per-campus copies of the function). **Exception:** the Dining Dashboard tab is inherently cross-campus (its purpose is discovering what *other* campuses buy) — the dropdown there sets "my campus" as a reference point rather than hard-filtering results, and is also used to highlight/star search results available through a distributor the selected campus already uses (a query-time join against `purchases.vendor`, no schema change needed; `lib.dining_dashboard.get_campus_vendors()`).
 
 ## Tech stack
 
@@ -110,15 +129,17 @@ Deployment target: local for now; eventual light public cloud deploy on Render (
 
 ## Build phases
 
-1. Ingestion pipeline (header mapping → non-food removal → aggregation → weight resolution Tiers 1-2 only where mechanically parseable → cert validation) → canonical SQLite tables. **No UI, no fuzzy entity matching yet, and no Tier 3 weight estimation** — anything not resolvable via a direct column or case-size parsing simply gets `weight_source = unresolved` and moves on.
-2. Entity resolution engine + human review queue (UI page)
-3. SIMAP-57 classification pass
-4. Optimization engine port (R → Python/PuLP, generalized across all categories, weight-aware) — needs to handle a mix of resolved and unresolved weights gracefully (e.g. exclude or flag `unresolved` rows from weight-based constraints rather than treating them as zero)
-5. Roadmap page + PDF report generator
-6. Dining Dashboard rebuild on canonical schema
-7. Auto-Classifier page
-8. Price Checker page
-9. Ongoing, cross-cutting: incremental Tier 2/Tier 3 weight resolution work, distributor by distributor — expected to continue well past Phase 1, likely with its own review-queue UI similar to the entity-matching one in Phase 2
+**All 8 phases are complete** (see "Current status" below for what shipped and what's still open within each). Kept here as the canonical phase numbering other sections refer back to:
+
+1. ✅ Ingestion pipeline (header mapping → non-food removal → aggregation → weight resolution Tiers 1-2 only where mechanically parseable → cert validation) → canonical SQLite tables. Tier 3 weight estimation is intentionally ongoing, cross-cutting work (see phase 9) rather than a one-time Phase 1 deliverable.
+2. ✅ Entity resolution engine + human review queue (`app/Entity_Match_Review.py`)
+3. ✅ SIMAP-57 classification pass
+4. ✅ Optimization engine port (R → Python/PuLP, generalized across all categories, weight-aware, `lib/optimization.py`) — see "Optimization engine" section below for the 3-tier bound structure, scenarios, and the price-outlier guard added after launch.
+5. ✅ Roadmap page + PDF report generator (`app/1_Campus_Roadmap.py`, `lib/pdf_report.py`)
+6. ✅ Dining Dashboard rebuild on canonical schema (`app/2_Dining_Dashboard.py`, `lib/dining_dashboard.py`)
+7. ✅ Auto-Classifier page (`app/3_Auto_Classifier.py`, `lib/auto_classifier.py`)
+8. ✅ Competitive Price Checker (`app/4_Competitive_Price_Checker.py`, `lib.optimization.solve_hypothetical_item_check`)
+9. **Ongoing, cross-cutting, never "done":** incremental Tier 2/Tier 3 weight resolution work, distributor by distributor. Expected to continue indefinitely; a live-db price-outlier guard (see "Optimization engine" below) now also catches some of the resulting bad weight data automatically, but doesn't replace this work.
 
 ## Weight resolution (`lib/weight_lookup/`) — parsing and inference, not lookup against complete data
 
@@ -135,6 +156,28 @@ This is not a lookup against complete distributor-provided weight files — no m
 **Phase 1 explicitly does not need to solve Tier 3.** Phase 1's ingestion pass should handle Tier 1 (direct weight columns) and attempt Tier 2 (case-size × unit-descriptor parsing) where mechanically straightforward, and simply mark anything else `weight_source = unresolved`. Building out the reference-item estimation table (Tier 3) — the "AI + human together" work of estimating and confirming per-unit weights for items with no size info at all — is a separate, later, ongoing effort. Don't let Phase 1 scope creep into trying to resolve every unweighted item; an honest `unresolved` flag is a complete and correct Phase 1 outcome for those rows.
 
 Practically, this means `purchases.total_weight_lbs` needs a companion `weight_source` column, and the Tier 3 reference table needs the same kind of `human_confirmed` field the entity-matching system already uses in `product_aliases` — the two problems (matching a raw name to a known identity, and trusting an inferred value) are structurally similar.
+
+## Optimization engine (`lib/optimization.py`, Phase 4) and its scenarios (Phases 5 & 8)
+
+`build_category_baseline(conn, campus, fiscal_year)` returns one row per SIMAP category (baseline spend/weight, split into sustainable/conventional sub-splits with their own $/lb, plus `food_group` and a GHG factor). Every scenario solver builds a PuLP LP over these rows and returns an `OptimizationResult` (`category_results`, `totals`, `assumptions`).
+
+**Reallocation is bounded three ways, nested** (tightened twice from an original ±50%, based on real project-owner feedback that looser bounds produced implausibly large single-category swings):
+1. **Global** — total food weight across every optimized category is held EXACTLY fixed (the analog of the legacy R model's fixed "meals served").
+2. **Food group** (`food_groups` table) — each group's total weight may move ±15% from its own baseline. This is the guardrail against, e.g., cutting beef and "offsetting" it with unrelated apples — substitution is only possible within a group of culinarily-reasonable alternatives.
+3. **Individual SIMAP category** — each category's own weight may also move ±15% from baseline.
+
+**`reference/food_groups.csv`** groups the 55 SIMAP categories into umbrellas: a combined "Protein" group (beef, poultry, pork, lamb, fish, crustaceans, mollusks, tofu, legumes, beans and pulses — 10 categories, all animal + plant protein together), "Dairy & Milk Alternatives" (milk/butter/cream/almond/oat/rice/soy milk), "Vegetables", "Fruits", "Grains & Starches", "Oils & Fats" — plus a long tail of **singleton groups** (Eggs, Wine Grapes, Tree nuts, Sugars, Cocoa, Stimulants, Liquids, and — per project-owner direction — **Peanuts/groundnuts** (pulled out of Protein into its own singleton) and **Cheese, Yogurt, and Ice cream** (each split out of a generic "Dairy" bucket into their own singleton, since the eventual goal is comparing them against non-dairy alternatives like dairy-free ice cream, not against milk).
+
+**Price-outlier guard** (`_flag_price_outliers`, inside `build_category_baseline`) — added after a real bug was traced to a single corrupted purchases row (UC Berkeley's raw export literally contained `"1,425,014.256 LB"` for a $244.84 case of frozen broccoli bowls, silently driving that category's price toward $0/lb). Flags a row as untrustworthy-for-weight-math (folded into the same bucket as `weight_source = 'unresolved'` — spend still counts, weight doesn't) when its implied $/lb is a per-category log-scale MAD outlier at `z > 7.5`. That threshold was calibrated against real data, not guessed: 6 confirmed-corrupted rows all score `z > 11`, while legitimate wide-but-real price spread within one category (e.g. raw bulk potatoes at $0.33/lb next to $4-100+/lb processed chips inside "Potatoes") tops out at `z = 1.89` — a lower threshold like the standard 3.5 boxplot rule flagged dozens of these legitimate rows as false positives.
+
+**Three scenarios**, all sharing the same bound structure:
+- `solve_min_spend_keep_sustainability` — minimize cost, subject to sustainable spend staying at/above baseline.
+- `solve_max_sustainable_keep_cost` — maximize sustainable spend, subject to cost staying at/below baseline.
+- `solve_threshold_third_of_scenario1` — runs scenario 1 first to find its achievable cost cut, then locks in only 1/3 of that cut and maximizes sustainable spend under the smaller target (project owner's exact spec, e.g. scenario 1 finds 9% possible → this commits to 3%).
+
+`identify_category_movers(category_results)` ranks which categories shifted most toward/away from sustainable spend, filtered to exclude categories with no real baseline choice (all-sustainable or all-conventional data) and below a materiality spend threshold. Its `price_ratio_sus_to_conv` field is the causal explanation for a shift (≤1 = a "free win," cost-neutral-or-better; >1 = the scenario's target, not price, is driving it) — this is the basis for the Roadmap page's "Key takeaways" panel, in plain language for a non-technical stakeholder audience (chefs and business staff, not just analysts).
+
+**Phase 8 (`HypotheticalItem` + `solve_hypothetical_item_check`)** mirrors the legacy R "Hypothetical Proteins" tab exactly rather than doing a simple $/lb comparison: it injects a proposed new item as a genuine third sourcing option for one existing SIMAP category (its own price, an optional supply cap defaulting to unlimited, a sustainability claim, zero baseline use) into the same real LP, and reports whether — and how much — the solver actually chose to use it. A great price can still lose if the category/food-group band is already maxed out; a middling price can still win if the scenario's sustainability target needs the extra spend. Implemented as backward-compatible optional parameters threaded through the existing internals (`_add_common_constraints`, `_cost_expr`, `_sus_spend_expr`, `_extract_results` all accept an optional `hyp` tuple, no-op when `None`) rather than a parallel code path, verified by running the full pre-existing test suite unchanged before adding new tests.
 
 ## Current status (as of this session)
 
@@ -177,3 +220,19 @@ Project owner's direction at the time:
 **Open item for next session, if picking up `find_and_merge_within_campus` idempotency**: the function should check for an existing candidate row (any status) for a pair before inserting, so it's safe to re-run repeatedly — that's the root cause of both this session's cleanup work and the pre-existing 157-row duplication.
 
 The project owner also offered to record *why* they judge two candidates the same during manual review (e.g. domain knowledge like "the leading 1 is a cut-size code, not a quantity") — worth asking them about this if picking up review-UI work, since it could inform future automated-matching improvements the same way this session's fixes did.
+
+### Phases 4–8 (2026-07-05 session): optimization engine through Competitive Price Checker
+
+Phases 1–3 above were already live in the database by the start of this session. This session built everything else — the whole back half of the project — and all 260 tests pass as of this commit.
+
+**Phase 4 (optimization engine, `lib/optimization.py`)** — see the dedicated "Optimization engine" section above for the full design (3-tier bounds, `food_groups`, price-outlier guard, 3 scenarios, `identify_category_movers`, `HypotheticalItem`). Bounds were tightened twice over the course of the session, from an initial ±50% to ±20% to the current ±15%, each time in direct response to project-owner feedback that looser bounds let the model recommend implausibly large single-category swings.
+
+**Phase 5 (`app/1_Campus_Roadmap.py`, `lib/pdf_report.py`)** — headline metrics emphasize the resulting **sustainable spend share** (e.g. "43.2%, +28 pts vs. status quo"), not just its %-change, per explicit project-owner direction that campuses care where they land, not just the delta. A "Key takeaways" panel (shared between the app and the PDF via `identify_category_movers`) explains *why* each category shifted in plain, non-technical language ("a free win" / "this shift is due to scenario constraints, not because it's price-competitive") after project-owner feedback that the original phrasing was too technical for a chef-and-business audience. One Altair chart per multi-member food group (paired baseline/optimized bars, sustainable/conventional stacked within each, % sustainable labeled on top) — singleton food groups are skipped since there's nothing to compare within-group. An earlier per-category "baseline vs. optimized weight" bar chart and a "My Campus Opportunity" stats tab were both built, then **removed** after project-owner feedback that they weren't useful in this form (the opportunity-analysis idea is earmarked to live in the Roadmap page instead, once the tools are unified, rather than in the Dining Dashboard where it first landed).
+
+**Phase 6 (`app/2_Dining_Dashboard.py`, `lib/dining_dashboard.py`)** — cross-campus search over `validated_sustainable_yn = 'Y'` products only, matched against `product_aliases` (not just `products.canonical_name`) so a chef benefits from every spelling variant any campus has ever reported. Price-free by design — `purchases.total_price`/`unit_price` are never read. A "distributor you already use" highlight (`get_campus_vendors()`) flags products another campus buys that are reachable through a distributor the selected campus already has a relationship with — the actual point of the tool, not just a generic cross-campus browse. Terminology matters here: "vendor" was renamed to "distributor" throughout the search tab (ambiguous otherwise), while the brand/manufacturer concept is labeled "vendor/supplier" on the Distributor Explorer tab instead, since campus staff use both terms for that concept. A region filter (NorCal/SoCal/Central) extends the legacy tool's `region_map` (which only covered 9 campuses) to all 14 in the `campuses` table; Central is *only* UC Merced, straight from the legacy mapping, not a new judgment call.
+
+**Phase 7 (`app/3_Auto_Classifier.py`, `lib/auto_classifier.py`)** — a deliberately **read-only** tool: a campus uploads any spreadsheet, picks which column has the product name, and gets the same sheet back with `sustainability_certifications`/`simap_category`/`validated_sustainable_yn` filled in wherever a confident match exists — but nothing is written to the database. This was an inferred scope decision, not explicit in CLAUDE.md's one-sentence spec — flag it if a write-back/ingestion-adjacent version was actually wanted instead. Reuses Phase 2's exact fuzzy-matching primitives (`_clean_for_matching`, `_all_gates_match`) against the `product_aliases` corpus rather than reimplementing matching logic. Three confidence tiers reuse Phase 2's own thresholds: "Confident match" (≥97), "Possible match — please review" (≥90), "No match found" (below threshold, or blocked by a hard gate like differing pack size regardless of text similarity).
+
+**Phase 8 (`app/4_Competitive_Price_Checker.py`, `HypotheticalItem`/`solve_hypothetical_item_check` in `lib/optimization.py`)** — see the "Optimization engine" section above for the core mechanic. UI specifics: the supply-cap field is optional (an "Unlimited supply" checkbox, checked by default, hides the numeric input; `max_weight_lbs=None` passes straight through to PuLP's `upBound=None`, genuinely unbounded rather than a large-number hack). Field labels were revised for a non-technical audience: "Food Category (from SIMAP)" and "Sustainable Item per AASHE STARS and/or PGH" rather than the original more jargon-heavy phrasing. A baseline-vs-optimized weight-breakdown chart was built, then removed after project-owner feedback that it "isn't particularly useful" — the verdict banner + price-comparison metrics carry the finding on their own.
+
+This repo has no branch/PR workflow — commits go straight to `master` (confirmed with the project owner as the intended workflow).

@@ -18,6 +18,18 @@
       "runtimeExecutable": "venv/bin/streamlit",
       "runtimeArgs": ["run", "app/2_Dining_Dashboard.py", "--server.headless", "true", "--server.port", "8503"],
       "port": 8503
+    },
+    {
+      "name": "auto-classifier",
+      "runtimeExecutable": "venv/bin/streamlit",
+      "runtimeArgs": ["run", "app/3_Auto_Classifier.py", "--server.headless", "true", "--server.port", "8504"],
+      "port": 8504
+    },
+    {
+      "name": "price-checker",
+      "runtimeExecutable": "venv/bin/streamlit",
+      "runtimeArgs": ["run", "app/4_Competitive_Price_Checker.py", "--server.headless", "true", "--server.port", "8505"],
+      "port": 8505
     }
   ]
 }

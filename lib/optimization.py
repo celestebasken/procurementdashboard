@@ -86,6 +86,31 @@ class OptimizationResult:
     assumptions: dict
 
 
+@dataclass
+class HypotheticalItem:
+    """Phase 8 (CLAUDE.md's Competitive Price Checker): a proposed new
+    purchasing option for one existing SIMAP category. Modeled as a genuine
+    third sourcing option alongside that category's existing
+    sustainable_price_per_lb/conventional_price_per_lb sub-splits (not a
+    price override of either) -- mirrors the legacy R "Hypothetical
+    Proteins" tab exactly (legacy/optimization/optimization_backend.R):
+    inject a new choice variable with a supply cap and zero baseline use,
+    then re-run the real optimization and see whether the solver actually
+    chooses to use it. See solve_hypothetical_item_check().
+
+    `max_weight_lbs=None` (the default) means an unlimited supply -- the
+    hypothetical is then bounded only by the same category/food-group/
+    global constraints every other sourcing option already has to respect,
+    not by an artificial cap. PuLP's LpVariable already treats
+    `upBound=None` as unbounded, so this passes straight through with no
+    extra branching in solve_hypothetical_item_check()."""
+
+    simap_category: str
+    price_per_lb: float
+    is_sustainable: bool
+    max_weight_lbs: float | None = None
+
+
 def _flag_price_outliers(df: pd.DataFrame) -> pd.Series:
     """Flags purchases rows whose implied $/lb is a statistical outlier
     within its own SIMAP category -- catches corrupted weight data that a
@@ -351,11 +376,23 @@ def _add_common_constraints(
     category_upper_multiplier: float,
     group_lower_multiplier: float,
     group_upper_multiplier: float,
+    hyp: tuple[HypotheticalItem, pulp.LpVariable] | None = None,
 ) -> None:
+    # Phase 8: a hypothetical item is just a third sourcing option for ONE
+    # category, so it slots into the exact same global/group/category
+    # weight sums every other tier already computes -- callers that don't
+    # pass `hyp` (every existing scenario) get byte-identical behavior,
+    # since this helper is a no-op when hyp is None.
+    def _category_weight_expr(cat):
+        expr = sus_vars[cat] + conv_vars[cat]
+        if hyp is not None and cat == hyp[0].simap_category:
+            expr = expr + hyp[1]
+        return expr
+
     # Tier 1 -- global: total weight across every optimized category is
     # held EXACTLY fixed (the campus still buys the same overall amount of
     # food; only the mix and sourcing changes).
-    total_weight_expr = pulp.lpSum(sus_vars[c] + conv_vars[c] for c in opt_df["simap_category"])
+    total_weight_expr = pulp.lpSum(_category_weight_expr(c) for c in opt_df["simap_category"])
     baseline_total_weight = opt_df["baseline_weight_lbs"].sum()
     prob += total_weight_expr == baseline_total_weight, "fixed_total_weight"
 
@@ -368,7 +405,7 @@ def _add_common_constraints(
     # tier's job is just to stop an entire food group (e.g. all of
     # Protein) from swinging too far, not to freeze it solid.
     for food_group, group_df in opt_df.groupby("food_group"):
-        group_weight_expr = pulp.lpSum(sus_vars[c] + conv_vars[c] for c in group_df["simap_category"])
+        group_weight_expr = pulp.lpSum(_category_weight_expr(c) for c in group_df["simap_category"])
         baseline_group_weight = group_df["baseline_weight_lbs"].sum()
         safe = _safe_name(food_group)
         prob += group_weight_expr >= baseline_group_weight * group_lower_multiplier, f"group_lower_{safe}"
@@ -379,22 +416,40 @@ def _add_common_constraints(
         cat = row["simap_category"]
         lower = row["baseline_weight_lbs"] * category_lower_multiplier
         upper = row["baseline_weight_lbs"] * category_upper_multiplier
-        prob += sus_vars[cat] + conv_vars[cat] >= lower, f"lower_bound_{_safe_name(cat)}"
-        prob += sus_vars[cat] + conv_vars[cat] <= upper, f"upper_bound_{_safe_name(cat)}"
+        prob += _category_weight_expr(cat) >= lower, f"lower_bound_{_safe_name(cat)}"
+        prob += _category_weight_expr(cat) <= upper, f"upper_bound_{_safe_name(cat)}"
 
 
-def _cost_expr(opt_df: pd.DataFrame, sus_vars: dict, conv_vars: dict):
-    return pulp.lpSum(
+def _cost_expr(
+    opt_df: pd.DataFrame,
+    sus_vars: dict,
+    conv_vars: dict,
+    hyp: tuple[HypotheticalItem, pulp.LpVariable] | None = None,
+):
+    expr = pulp.lpSum(
         _price(row, "sustainable_price_per_lb") * sus_vars[row["simap_category"]]
         + _price(row, "conventional_price_per_lb") * conv_vars[row["simap_category"]]
         for _, row in opt_df.iterrows()
     )
+    if hyp is not None:
+        item, var = hyp
+        expr = expr + item.price_per_lb * var
+    return expr
 
 
-def _sus_spend_expr(opt_df: pd.DataFrame, sus_vars: dict):
-    return pulp.lpSum(
+def _sus_spend_expr(
+    opt_df: pd.DataFrame,
+    sus_vars: dict,
+    hyp: tuple[HypotheticalItem, pulp.LpVariable] | None = None,
+):
+    expr = pulp.lpSum(
         _price(row, "sustainable_price_per_lb") * sus_vars[row["simap_category"]] for _, row in opt_df.iterrows()
     )
+    if hyp is not None:
+        item, var = hyp
+        if item.is_sustainable:
+            expr = expr + item.price_per_lb * var
+    return expr
 
 
 def _solve(prob: pulp.LpProblem, scenario_name: str) -> None:
@@ -413,21 +468,34 @@ def _extract_results(
     conv_vars: dict,
     scenario_name: str,
     assumptions: dict,
+    hyp: tuple[HypotheticalItem, pulp.LpVariable] | None = None,
 ) -> OptimizationResult:
     optimized_rows = []
     for _, row in baseline_df.iterrows():
         cat = row["simap_category"]
         baseline_ghg = _ghg_kg(row, "baseline_weight_lbs")
+        hyp_w = 0.0
+        if hyp is not None and hyp[0].simap_category == cat:
+            hyp_w = hyp[1].value() or 0.0
+        hyp_spend = hyp_w * hyp[0].price_per_lb if hyp is not None else 0.0
 
         if cat in sus_vars:
             opt_sus_w = sus_vars[cat].value() or 0.0
             opt_conv_w = conv_vars[cat].value() or 0.0
             opt_sus_spend = opt_sus_w * _price(row, "sustainable_price_per_lb")
             opt_conv_spend = opt_conv_w * _price(row, "conventional_price_per_lb")
+            # The hypothetical's spend counts toward whichever bucket its
+            # own claimed status says it belongs to -- NOT re-derived from
+            # anything else, since that claim (is_sustainable) is exactly
+            # what a real supplier would also have to substantiate.
+            if hyp_w and hyp[0].is_sustainable:
+                opt_sus_spend += hyp_spend
+            elif hyp_w:
+                opt_conv_spend += hyp_spend
             opt_ghg = (
                 0.0
                 if pd.isna(row["ghg_factor_kg_per_kg"])
-                else (opt_sus_w + opt_conv_w) * KG_PER_LB * row["ghg_factor_kg_per_kg"]
+                else (opt_sus_w + opt_conv_w + hyp_w) * KG_PER_LB * row["ghg_factor_kg_per_kg"]
             )
         else:
             # Excluded from the LP (no resolved weight at all, so no $/lb
@@ -447,7 +515,7 @@ def _extract_results(
                 "simap_category": cat,
                 "food_group": row["food_group"],
                 "baseline_weight_lbs": row["baseline_weight_lbs"],
-                "optimized_weight_lbs": opt_sus_w + opt_conv_w,
+                "optimized_weight_lbs": opt_sus_w + opt_conv_w + hyp_w,
                 "baseline_spend": row["baseline_spend"],
                 "optimized_spend": opt_sus_spend + opt_conv_spend,
                 "baseline_sustainable_spend": row["baseline_sustainable_spend"],
@@ -460,6 +528,10 @@ def _extract_results(
                 # share moved -- see identify_category_movers().
                 "sustainable_price_per_lb": row["sustainable_price_per_lb"],
                 "conventional_price_per_lb": row["conventional_price_per_lb"],
+                # 0.0 for every category except the hypothetical's own (and
+                # always 0.0 when hyp=None) -- how much of it the solver
+                # actually chose to use, the whole point of Phase 8.
+                "hypothetical_weight_lbs": hyp_w,
             }
         )
 
@@ -715,3 +787,83 @@ def solve_threshold_third_of_scenario1(
     # of Scenario 1) then Maximize").
     result.scenario_name = "Threshold (1/3 of Scenario 1) then Maximize"
     return result
+
+
+def solve_hypothetical_item_check(
+    baseline_df: pd.DataFrame,
+    hypothetical: HypotheticalItem,
+    cost_reduction_target: float = 0.0,
+    category_lower_multiplier: float = CATEGORY_LOWER_MULTIPLIER_DEFAULT,
+    category_upper_multiplier: float = CATEGORY_UPPER_MULTIPLIER_DEFAULT,
+    group_lower_multiplier: float = GROUP_LOWER_MULTIPLIER_DEFAULT,
+    group_upper_multiplier: float = GROUP_UPPER_MULTIPLIER_DEFAULT,
+) -> OptimizationResult:
+    """Phase 8 (CLAUDE.md's Competitive Price Checker): "tests whether a
+    hypothetical new item would be cost-competitive enough to enter a
+    campus's optimized purchasing plan." Mirrors the legacy R
+    "Hypothetical Proteins" tab exactly (legacy/optimization/app.R,
+    optimization_backend.R): injects a new sourcing option for ONE existing
+    SIMAP category -- its own price and a supply cap (`max_weight_lbs`),
+    starting from zero baseline use -- into the same real optimization the
+    rest of this module runs (maximize sustainable spend under a cost
+    cap, Scenario 3's exact mechanic, matching the legacy tab's own
+    behavior), then reports whether -- and how much -- the solver actually
+    chose to use it.
+
+    This is a genuine "would the optimizer pick this" test, not a
+    break-even $/lb comparison: a hypothetical can lose even at a great
+    price if its category or food group is already pinned near its
+    +/-15% bound, and can win even at a so-so price if the scenario's
+    sustainability target needs the extra spend it provides. Read
+    `result.category_results.loc[result.category_results["simap_category"]
+    == hypothetical.simap_category, "hypothetical_weight_lbs"]` for how
+    much (if any) got adopted -- 0.0 means the solver rejected it entirely.
+
+    cost_reduction_target=0.0 (default) is the loosest possible cap --
+    "don't exceed today's spend," matching Scenario 2's framing; set it
+    higher to test whether the hypothetical still gets chosen even under
+    real cost-cutting pressure."""
+    if hypothetical.simap_category not in baseline_df["simap_category"].values:
+        raise ValueError(
+            f"{hypothetical.simap_category!r} is not a SIMAP category with baseline purchases for this "
+            "campus/fiscal year -- pick one from build_category_baseline()'s simap_category column."
+        )
+
+    opt_df = baseline_df[baseline_df["baseline_weight_lbs"] > 0].reset_index(drop=True)
+    if hypothetical.simap_category not in opt_df["simap_category"].values:
+        raise ValueError(
+            f"{hypothetical.simap_category!r} has zero resolved baseline weight for this campus/fiscal year, "
+            "so there's no existing purchasing to compare a hypothetical item against."
+        )
+
+    baseline_cost_opt = opt_df["baseline_spend"].sum()
+    cost_cap = baseline_cost_opt * (1 - cost_reduction_target)
+
+    sus_vars, conv_vars = _build_variables(opt_df)
+    hyp_var = pulp.LpVariable(
+        f"hyp_{_safe_name(hypothetical.simap_category)}", lowBound=0, upBound=hypothetical.max_weight_lbs
+    )
+    hyp = (hypothetical, hyp_var)
+
+    prob = pulp.LpProblem("hypothetical_item_check", pulp.LpMaximize)
+    prob += _sus_spend_expr(opt_df, sus_vars, hyp=hyp)
+    _add_common_constraints(
+        prob, opt_df, sus_vars, conv_vars,
+        category_lower_multiplier, category_upper_multiplier, group_lower_multiplier, group_upper_multiplier,
+        hyp=hyp,
+    )
+    prob += _cost_expr(opt_df, sus_vars, conv_vars, hyp=hyp) <= cost_cap, "cost_cap"
+    _solve(prob, "Phase 8 (competitive price check)")
+
+    assumptions = _assumptions_dict(
+        category_lower_multiplier, category_upper_multiplier, group_lower_multiplier, group_upper_multiplier
+    )
+    assumptions["cost_reduction_target"] = cost_reduction_target
+    assumptions["hypothetical_simap_category"] = hypothetical.simap_category
+    assumptions["hypothetical_price_per_lb"] = hypothetical.price_per_lb
+    assumptions["hypothetical_max_weight_lbs"] = hypothetical.max_weight_lbs
+    assumptions["hypothetical_is_sustainable"] = hypothetical.is_sustainable
+
+    return _extract_results(
+        baseline_df, opt_df, sus_vars, conv_vars, "Competitive Price Checker", assumptions, hyp=hyp
+    )
