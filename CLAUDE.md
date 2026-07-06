@@ -127,6 +127,12 @@ Python, Streamlit, SQLite, `rapidfuzz` (entity matching), `PuLP` (optimization, 
 
 Deployment target: local for now; eventual light public cloud deploy on Render (already used for the existing Dining Dashboard) — SQLite is fine with a persistent disk, no need to design around this yet.
 
+**Render deployment scaffolding (`Dockerfile`, `.dockerignore`, `render.yaml`)** has been built — see README.md's "Deploying to Render" for the actual runbook. Key decisions, confirmed with the project owner:
+- **Docker, not Render's native Python runtime** — WeasyPrint needs system libraries (glib/pango/harfbuzz/fontconfig; verified against the actual `ffi.dlopen()` calls in the installed `weasyprint==69.0` package, not just its docs — modern WeasyPrint dropped the older cairo/GDK-Pixbuf dependency chain) and Render's native runtime has no `apt-get` access to install them.
+- **Persistent Disk + manual one-time upload** for `procurement.db` — the db holds real campus data and is gitignored, so it can never be baked into the image or come from a git-based build; it's uploaded once via Render's SSH access after first deploy, onto a disk mounted at `/var/data`. `lib/db.py`'s `DEFAULT_DB_PATH` now reads an optional `PROCUREMENT_DB_PATH` env var (falling back to the local repo-relative path) so this needed no other code changes.
+- **Entity Match Review hidden entirely in production** rather than deployed open or gated behind new auth code — `app/Home.py` only adds it to the nav when `SHOW_ADMIN_PAGE` (env var) is not `"false"`; `render.yaml` sets it to `"false"`, so the page (the one page that mutates canonical data, with no access control) simply isn't reachable on the public deployment yet. Shown by default locally (unset env var). Real auth for this page is still a future task if/when it needs to be used remotely rather than just locally.
+- **Not yet done, deliberately out of scope for this pass**: the actual Render service has not been created (no live URL yet), the Dockerfile/build has not been verified locally (Docker isn't installed on this dev machine) or in Render's own build — first real build test will be Render's cloud build once the project owner creates the service from this Blueprint.
+
 ## Build phases
 
 **All 8 phases are complete** (see "Current status" below for what shipped and what's still open within each). Kept here as the canonical phase numbering other sections refer back to:

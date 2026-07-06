@@ -3,10 +3,7 @@
 Consolidates the 5 previously-standalone pages (each ran as its own
 `streamlit run app/N_Something.py` process on its own port -- see the old
 per-page `.claude/launch.json` entries) into ONE real multi-page app via
-`st.navigation`/`st.Page`, per CLAUDE.md's "Front end" section: "Designed
-as one Streamlit app, multi-tab... Current reality: each page is still
-standalone." This file is what makes that design real rather than
-aspirational.
+`st.navigation`/`st.Page`.
 
 `st.set_page_config()` can only be called once per app run, and must be the
 first Streamlit command -- it now lives here ONLY; it has been removed from
@@ -25,12 +22,19 @@ Run with `streamlit run app/Home.py` (see .claude/launch.json's single
 point at once this is deployed (see README.md's deployment note).
 """
 
+import os
 import sys
 from pathlib import Path
 
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# Entity Match Review mutates the shared canonical database and has no
+# access control -- shown by default for local use, but Render's env sets
+# SHOW_ADMIN_PAGE=false so it's never reachable on the public deployment
+# until real auth is added in front of it.
+_SHOW_ADMIN_PAGE = os.environ.get("SHOW_ADMIN_PAGE", "true").strip().lower() not in ("false", "0", "")
 
 st.set_page_config(page_title="UC Dining Sustainability Dashboard", page_icon="🌱", layout="wide")
 
@@ -99,15 +103,15 @@ classifier_page = st.Page(_APP_DIR / "3_Auto_Classifier.py", title="Auto-Classif
 price_checker_page = st.Page(
     _APP_DIR / "4_Competitive_Price_Checker.py", title="Price Checker", icon="💲", url_path="price-checker"
 )
-entity_review_page = st.Page(
-    _APP_DIR / "Entity_Match_Review.py", title="Entity Match Review", icon="🔍", url_path="entity-review"
-)
+nav_sections = {
+    "": [home_page],
+    "Dashboard": [roadmap_page, dining_page, classifier_page, price_checker_page],
+}
+if _SHOW_ADMIN_PAGE:
+    entity_review_page = st.Page(
+        _APP_DIR / "Entity_Match_Review.py", title="Entity Match Review", icon="🔍", url_path="entity-review"
+    )
+    nav_sections["Admin"] = [entity_review_page]
 
-nav = st.navigation(
-    {
-        "": [home_page],
-        "Dashboard": [roadmap_page, dining_page, classifier_page, price_checker_page],
-        "Admin": [entity_review_page],
-    }
-)
+nav = st.navigation(nav_sections)
 nav.run()

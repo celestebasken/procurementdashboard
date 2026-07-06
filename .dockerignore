@@ -1,0 +1,16 @@
+# Private campus data -- never in the image. Also already gitignored, so a
+# git-based Render build wouldn't have it anyway, but this protects a local
+# `docker build .` too.
+data/
+
+venv/
+.git/
+.pytest_cache/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Not needed at runtime -- keeps the image smaller.
+tests/
+legacy/
+.claude/

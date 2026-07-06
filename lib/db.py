@@ -6,10 +6,18 @@ happens in reference_loader.py, and populating purchases/products happens in
 ingestion.py.
 """
 
+import os
 import sqlite3
 from pathlib import Path
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "processed" / "procurement.db"
+# Overridable via the PROCUREMENT_DB_PATH env var so a deployed instance (e.g.
+# Render, where the db lives on a mounted persistent disk rather than inside
+# the repo checkout) can point this at a different location without code
+# changes. Falls back to the local repo-relative path used in development.
+DEFAULT_DB_PATH = Path(
+    os.environ.get("PROCUREMENT_DB_PATH")
+    or Path(__file__).resolve().parent.parent / "data" / "processed" / "procurement.db"
+)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS campuses (
