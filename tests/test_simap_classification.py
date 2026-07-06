@@ -5,6 +5,7 @@ import pytest
 
 from lib.db import init_db, migrate_schema
 from lib.simap_classification import (
+    _apply_plant_based_override,
     build_campus_category_lookup,
     classify_all,
     keyword_match,
@@ -124,6 +125,116 @@ def test_keyword_match_handles_o_ending_irregular_plural():
     assert keyword_match("SNR TOMATOES DICED 1/4 2/5LB", d) == "Tomatoes"
     assert keyword_match("POTATOES RED B 50 LBS", d) == "Potatoes"
     assert keyword_match("TOMATO PASTE FANCY CA", d) == "Tomatoes"  # singular still matches
+
+
+# --------------------------------------------------------------------------
+# _apply_plant_based_override
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "name,category,expected",
+    [
+        # "X milk"/"milk X" in either order is unambiguous regardless of
+        # product form or which tier produced the buggy original category.
+        ("MILK ALMOND BARISTA BLEND CALIFIA (SUS)", "Milk (cow's milk)", ("Almond milk", "plant_based_override")),
+        ("MILK OAT BARISTA BLEND", "Milk (cow's milk)", ("Oat milk", "plant_based_override")),
+        ("MILK SOY BULK", "Milk (cow's milk)", ("Soy milk", "plant_based_override")),
+        ("NON-DAIRY MILK RICE ORIGINAL ORG", "Milk (cow's milk)", ("Rice milk", "plant_based_override")),
+        ("MY MOCHI ICE CREAM SLTD CARAL OAT MILK 12 (6 CT)", "Ice cream", ("Oat milk", "plant_based_override")),
+        # coconut/pea have no matching SIMAP category -- unclassified, not guessed.
+        ("MILK COCONUT BARISTA (SUS)", "Milk (cow's milk)", (None, "unclassified")),
+        ("MILK PEAMILK CHOC BULK UPROOT", "Milk (cow's milk)", (None, "unclassified")),
+        # Named plant type + explicit non-dairy marker, no "milk" word at all.
+        ("CREAMER SILK VANILLA SOY DAIRY FREE", "Cream", ("Soy milk", "plant_based_override")),
+        ("VEGAN YOGURT OAT PLAIN", "Yogurt", ("Oat milk", "plant_based_override")),
+        # Two different plant types named -- ambiguous, no defensible single answer.
+        ("NON-DAIRY CREAMER COCONUT ALMOND CALIFA", "Cream", (None, "unclassified")),
+        # Generic vegan/non-dairy marker, no named plant type: butter is the
+        # one confirmed dominant-ingredient exception (oil-based).
+        ("BUTTER SOLID UNSALTED VEGAN (SUS)", "Milk (cow's milk)", ("Vegetable oils", "plant_based_override")),
+        ("BUTTER SOLID STICK VEGAN 18/16OZ", "Butter", ("Vegetable oils", "plant_based_override")),
+        # Generic marker, no named type, not butter -- no defensible category.
+        ("CREAM WHIPPING NON DAIRY (SUS)", "Cream", (None, "unclassified")),
+        ("NON-DAIRY CHEESE CREAM ALT CHIVE", "Cheese", (None, "unclassified")),
+    ],
+)
+def test_apply_plant_based_override_corrects_known_cases(name, category, expected):
+    assert _apply_plant_based_override(name, category) == expected
+
+
+@pytest.mark.parametrize(
+    "name,category",
+    [
+        # Real dairy products where almond/coconut/rice are a FLAVOR, not a
+        # substitute base -- no "milk" adjacency and no vegan/non-dairy
+        # marker, so these must NOT be swept into a plant-milk category.
+        ("ICE CREAM BAR HAAGEN-DAZS VANILLA ALMOND", "Ice cream"),
+        ("CHOBANI LOW FAT COCONUT GREEK YOGURT", "Yogurt"),
+        ("YOGHURT NOOSA COCONUT 8OZ", "Yogurt"),
+        ("LUNDBERG WHITE CHEDDAR RICE CAKE MINIS", "Cheese"),
+        ("AMY'S MAC & CHEESE, RICE GF", "Cheese"),
+        ("BARNEY BUTTER SMOOTH ALMOND BUTTER 6 (10 OZ)", "Butter"),
+        ("DESSERT BAR MANGO COCONUT CRUNCH", "Ice cream"),
+        # A normal dairy product with no plant-based signal at all.
+        ("Cheddar Cheese Block", "Cheese"),
+    ],
+)
+def test_apply_plant_based_override_leaves_real_dairy_products_alone(name, category):
+    assert _apply_plant_based_override(name, category) is None
+
+
+@pytest.mark.parametrize(
+    "name,category",
+    [
+        # "Butter" as a flavor compound ("cookie butter" is a spread, not
+        # dairy butter) must not trigger the Vegetable oils override just
+        # because a generic non-dairy marker is also present -- found via
+        # real-data audit against the live db before this fix was applied.
+        ("ICE CREAM, COOKIE BUTTER NON-DAIRY FROZEN CUP", "Ice cream"),
+        # Same flavor-compound problem, but the current category is Cream
+        # rather than Ice cream -- must stay unclassified either way, not
+        # be swept into Vegetable oils just because "butter" appears.
+        ("PEANUT BUTTER NON-DAIRY FROSTING", "Cream"),
+    ],
+)
+def test_apply_plant_based_override_vegetable_oils_only_for_butter_and_milk_categories(name, category):
+    # Still an override (unclassified, since there's a generic non-dairy
+    # marker and no named plant type) -- just not Vegetable oils, since
+    # these products were never really Butter/Milk to begin with.
+    assert _apply_plant_based_override(name, category) == (None, "unclassified")
+
+
+def test_apply_plant_based_override_ignores_categories_outside_the_dairy_set():
+    # Even an explicit "vegan" marker shouldn't trigger an override for a
+    # category this fix was never scoped to touch.
+    assert _apply_plant_based_override("VEGAN BEEF STYLE CRUMBLES", "Beef & buffalo meat") is None
+    assert _apply_plant_based_override("Mystery Item", None) is None
+
+
+def test_classify_all_applies_plant_based_override_end_to_end(conn, tmp_path):
+    # UC Davis's own Product Category column says "Milk" for this row (the
+    # real confirmed bug) -- classify_all must still correct it to Oat milk.
+    (tmp_path / "UCD_FY25.csv").write_text(
+        "Name,Product Category,Product Subcategory\nMILK OAT BARISTA BLEND,Milk,\n"
+    )
+    for other in ["UCB_FY25.csv", "UCD_H_FY25.csv", "UCLA_H_FY25.csv", "UCR_FY25.csv", "UCSC_FY25.csv", "UCSD_H_FY25.csv"]:
+        _write_stub(tmp_path, other)
+
+    a = _add_product(conn, "MILK OAT BARISTA BLEND", "UC Berkeley", "MILK OAT BARISTA BLEND")
+    conn.execute(
+        "INSERT INTO campuses (campus, primary_standard, campus_type, abbreviation) "
+        "VALUES ('UC Davis', 'AASHE STARS', 'Academic', 'UCD')"
+    )
+    conn.execute("UPDATE product_aliases SET campus = 'UC Davis' WHERE product_id = ?", (a,))
+    conn.commit()
+
+    counts = classify_all(conn, tmp_path)
+
+    row = conn.execute(
+        "SELECT simap_category, simap_classification_source FROM products WHERE product_id = ?", (a,)
+    ).fetchone()
+    assert row == ("Oat milk", "plant_based_override")
+    assert counts["plant_based_override"] == 1
 
 
 # --------------------------------------------------------------------------

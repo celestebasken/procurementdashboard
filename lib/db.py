@@ -65,7 +65,8 @@ CREATE TABLE IF NOT EXISTS products (
     canonical_name TEXT NOT NULL,
     simap_category TEXT,
     simap_classification_source TEXT CHECK (
-        simap_classification_source IN ('campus_category', 'keyword_match', 'unclassified') OR simap_classification_source IS NULL
+        simap_classification_source IN ('campus_category', 'keyword_match', 'plant_based_override', 'unclassified')
+        OR simap_classification_source IS NULL
     ),
     sustainability_certifications TEXT,
     sustainable_yn TEXT NOT NULL DEFAULT 'NA' CHECK (sustainable_yn IN ('Y', 'N', 'NA')),

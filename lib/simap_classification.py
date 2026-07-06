@@ -139,6 +139,102 @@ def _keyword_pattern(keyword: str) -> re.Pattern:
     return _WORD_RE_CACHE[keyword]
 
 
+# Products that end up classified into one of these 5 categories are the
+# ones vulnerable to two confirmed real bugs: (1) campus_category trusting a
+# campus's own coarse "Milk"/"Dairy" department tag over the product name
+# (e.g. UC Davis's own Product Category column literally says "Milk" for
+# "BUTTER SOLID UNSALTED VEGAN (SUS)"), and (2) keyword_match missing
+# reversed-word-order compounds ("MILK OAT" vs the dictionary's "Oat Milk").
+# _apply_plant_based_override() below is a targeted correction that runs
+# after both tiers, scoped only to these 5 categories -- it never touches
+# products classified anywhere else.
+_DAIRY_ALTERNATIVE_CATEGORIES = {"Milk (cow's milk)", "Butter", "Cream", "Cheese", "Ice cream", "Yogurt"}
+
+# Plant-milk types SIMAP-57 has a dedicated category for.
+_PLANT_MILK_CATEGORIES = {"oat": "Oat milk", "soy": "Soy milk", "almond": "Almond milk", "rice": "Rice milk"}
+# coconut and pea have no matching SIMAP-57 category at all -- left
+# unclassified rather than force-mapped, same philosophy CLAUDE.md already
+# documents for water and unfit sauces.
+_PLANT_TYPES_NO_CATEGORY = {"coconut", "pea"}
+
+# "X milk"/"milk X" in either order (also catches "PEAMILK", zero spaces)
+# is an unambiguous plant-milk signal regardless of product form (yogurt,
+# ice cream, creamer) -- e.g. "MY MOCHI ICE CREAM ... OAT MILK" really is
+# oat-based. Built once at import time, not per-call, like _WORD_RE_CACHE.
+_MILK_ADJACENT_PATTERNS = {
+    plant_type: re.compile(rf"\b{plant_type}\s?milk\b|\bmilk\s?{plant_type}\b", re.IGNORECASE)
+    for plant_type in (*_PLANT_MILK_CATEGORIES, *_PLANT_TYPES_NO_CATEGORY)
+}
+
+# Only trust a BARE plant-type word (not adjacent to "milk") as a
+# dairy-substitute signal when one of these explicit qualifiers is also
+# present. Without this gate, "almond"/"coconut"/"rice" are extremely
+# common flavor words in genuinely dairy products -- audited against real
+# data before adding this gate: "CHOBANI LOW FAT COCONUT GREEK YOGURT",
+# "ICE CREAM HAAGEN-DAZS ... ALMOND", "LUNDBERG WHITE CHEDDAR RICE CAKE
+# MINIS", and "AMY'S MAC & CHEESE, RICE GF" would all be wrongly swept into
+# a plant-milk category without this check (none of them are dairy-free).
+_GENERIC_DAIRY_FREE_RE = re.compile(
+    r"\b(vegan|non-dairy|non dairy|dairy-free|dairy free|plant-based|plant based)\b", re.IGNORECASE
+)
+
+
+def _find_bare_plant_type_words(name: str) -> set[str]:
+    found = {pt for pt in _PLANT_MILK_CATEGORIES if _keyword_pattern(pt).search(name)}
+    if _keyword_pattern("coconut").search(name):
+        found.add("coconut")
+    if _keyword_pattern("pea").search(name):
+        found.add("pea")
+    return found
+
+
+def _apply_plant_based_override(canonical_name: str, category: str | None) -> tuple[str | None, str] | None:
+    """Corrects plant-based items misclassified into a dairy category (see
+    _DAIRY_ALTERNATIVE_CATEGORIES above for the two root-cause bugs this
+    covers). Returns None when no override applies -- the tier result that
+    was already computed stands unchanged. Otherwise returns the
+    replacement (category, source) to use instead."""
+    if category not in _DAIRY_ALTERNATIVE_CATEGORIES:
+        return None
+
+    milk_adjacent = {pt for pt, pattern in _MILK_ADJACENT_PATTERNS.items() if pattern.search(canonical_name)}
+    has_generic_signal = bool(_GENERIC_DAIRY_FREE_RE.search(canonical_name))
+
+    if milk_adjacent:
+        plant_types = milk_adjacent
+    elif has_generic_signal:
+        plant_types = _find_bare_plant_type_words(canonical_name)
+    else:
+        plant_types = set()
+
+    if len(plant_types) == 1:
+        (plant_type,) = plant_types
+        if plant_type in _PLANT_MILK_CATEGORIES:
+            return _PLANT_MILK_CATEGORIES[plant_type], "plant_based_override"
+        return None, "unclassified"  # coconut/pea: no matching SIMAP category
+
+    if len(plant_types) > 1:
+        return None, "unclassified"  # ambiguous -- e.g. "COCONUT ALMOND" creamer
+
+    if has_generic_signal:
+        # No specific plant type named, but an explicit vegan/non-dairy
+        # marker is present. Butter substitutes are the one confirmed
+        # dominant-ingredient exception (oil-based) -- everything else
+        # with no named ingredient (generic non-dairy cream/cheese/ice
+        # cream/yogurt) has no defensible single category to move to.
+        # Gated on the ORIGINAL category actually being Butter or Milk
+        # (never Cream/Cheese/Ice cream/Yogurt) -- found via real-data
+        # audit: "ICE CREAM, COOKIE BUTTER NON-DAIRY FROZEN CUP" contains
+        # the word "butter" as a flavor compound ("cookie butter" is a
+        # spread, not dairy butter), and would wrongly become "Vegetable
+        # oils" without this restriction.
+        if category in ("Butter", "Milk (cow's milk)") and _keyword_pattern("butter").search(canonical_name):
+            return "Vegetable oils", "plant_based_override"
+        return None, "unclassified"
+
+    return None
+
+
 def keyword_match(name: str, dictionary: dict[str, str]) -> str | None:
     """Longest matching dictionary keyword wins (more specific phrases like
     'Baked Goods' beat generic single words when both appear). Ties on
@@ -197,7 +293,11 @@ def classify_all(conn: sqlite3.Connection, data_dir: Path = DATA_RAW_DIR) -> dic
         if category is None:
             source = "unclassified"
 
-        counts[source] += 1
+        override = _apply_plant_based_override(group["canonical_name"].iloc[0], category)
+        if override is not None:
+            category, source = override
+
+        counts[source] = counts.get(source, 0) + 1
         updates.append((category, source, product_id))
 
     conn.executemany(
