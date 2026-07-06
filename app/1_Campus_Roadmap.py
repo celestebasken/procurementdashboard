@@ -24,10 +24,12 @@ unrelated category like apples.
 Also generates the PDF report (lib.pdf_report) for the current snapshot
 and/or whichever scenario was last run.
 
-Standalone for now -- run directly with `streamlit run app/1_Campus_Roadmap.py`.
-This is the first page needing cross-tab state, so it introduces
+Part of the unified app/Home.py multi-page shell (also still runnable
+standalone via `streamlit run app/1_Campus_Roadmap.py` for local
+debugging). This was the first page to introduce
 st.session_state["selected_campus"] (CLAUDE.md's "global campus dropdown"),
-for future pages to share once a shared multi-tab shell exists.
+anticipating exactly this consolidation -- it's now genuinely shared across
+every page in the same session, no extra plumbing needed.
 """
 
 import sqlite3
@@ -56,7 +58,9 @@ from lib.optimization import (
 )
 from lib.pdf_report import generate_pdf_report
 
-st.set_page_config(page_title="Campus Roadmap", layout="wide")
+# st.set_page_config() now lives in app/Home.py (the single multi-page app
+# entry point) -- it can only be called once per run, and Home.py's
+# st.navigation() executes this file as a page within that same run.
 
 SCENARIOS = {
     "Min Spend (keep sustainability floor)": "min_spend",

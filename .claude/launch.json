@@ -2,34 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "entity-match-review",
+      "name": "dashboard",
       "runtimeExecutable": "venv/bin/streamlit",
-      "runtimeArgs": ["run", "app/Entity_Match_Review.py", "--server.headless", "true"],
+      "runtimeArgs": ["run", "app/Home.py", "--server.headless", "true", "--server.port", "8501"],
       "port": 8501
-    },
-    {
-      "name": "campus-roadmap",
-      "runtimeExecutable": "venv/bin/streamlit",
-      "runtimeArgs": ["run", "app/1_Campus_Roadmap.py", "--server.headless", "true", "--server.port", "8502"],
-      "port": 8502
-    },
-    {
-      "name": "dining-dashboard",
-      "runtimeExecutable": "venv/bin/streamlit",
-      "runtimeArgs": ["run", "app/2_Dining_Dashboard.py", "--server.headless", "true", "--server.port", "8503"],
-      "port": 8503
-    },
-    {
-      "name": "auto-classifier",
-      "runtimeExecutable": "venv/bin/streamlit",
-      "runtimeArgs": ["run", "app/3_Auto_Classifier.py", "--server.headless", "true", "--server.port", "8504"],
-      "port": 8504
-    },
-    {
-      "name": "price-checker",
-      "runtimeExecutable": "venv/bin/streamlit",
-      "runtimeArgs": ["run", "app/4_Competitive_Price_Checker.py", "--server.headless", "true", "--server.port", "8505"],
-      "port": 8505
     }
   ]
 }

@@ -16,14 +16,15 @@ For full project context, architecture, and schema decisions, see [`CLAUDE.md`](
    ```
    pip install -r requirements.txt
    ```
-4. Run a page (each is currently standalone — see `.claude/launch.json` for the full list and ports):
+4. Run the app:
    ```
-   streamlit run app/1_Campus_Roadmap.py
+   streamlit run app/Home.py
    ```
+   This is the single entry point for the whole multi-page dashboard (Home + Campus Roadmap, Dining Dashboard, Auto-Classifier, Price Checker, and the Entity Match Review admin page, all under one nav sidebar and one shared session). Each page file is also still runnable standalone (e.g. `streamlit run app/1_Campus_Roadmap.py`) for local debugging.
 
 ## Repo structure
 
-- `app/` — Streamlit pages: `1_Campus_Roadmap.py`, `2_Dining_Dashboard.py`, `3_Auto_Classifier.py`, `4_Competitive_Price_Checker.py`, plus the Phase 2 review tool `Entity_Match_Review.py`. Each runs standalone for now (own port), but all share the same `st.session_state["selected_campus"]` key so they're ready to be consolidated into one multi-page app later.
+- `app/` — `Home.py` is the unified entry point (`st.navigation`); pages are `1_Campus_Roadmap.py`, `2_Dining_Dashboard.py`, `3_Auto_Classifier.py`, `4_Competitive_Price_Checker.py`, plus the Phase 2 review tool `Entity_Match_Review.py` (grouped under an "Admin" nav section — it mutates canonical data, unlike the other four). All pages share one `st.session_state["selected_campus"]` key within a session.
 - `lib/` — shared logic: data ingestion, entity matching, classification, optimization (`optimization.py`), PDF generation, weight resolution, the Dining Dashboard's cross-campus query layer (`dining_dashboard.py`), and the Auto-Classifier's fuzzy-match layer (`auto_classifier.py`)
 - `legacy/` — prior R and Python implementations, kept for reference during the rebuild
 - `reference/` — static lookup data (SIMAP-57 categories, certification vocabulary, campus metadata, food-group substitution umbrellas, weight dictionaries)

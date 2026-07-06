@@ -15,9 +15,10 @@ lose even at a great price if its category or food group is already
 pinned near its +/-15% band, and can win even at a middling price if the
 scenario's sustainability target needs the extra spend it provides.
 
-Standalone for now, like the other pages in this rebuild -- run directly
-with `streamlit run app/4_Competitive_Price_Checker.py`. Reuses the same
-st.session_state["selected_campus"] key as the other pages.
+Part of the unified app/Home.py multi-page shell (also still runnable
+standalone via `streamlit run app/4_Competitive_Price_Checker.py` for local
+debugging). Reuses the same st.session_state["selected_campus"] key as the
+other pages.
 """
 
 import sqlite3
@@ -41,7 +42,7 @@ from lib.optimization import (
     solve_hypothetical_item_check,
 )
 
-st.set_page_config(page_title="Competitive Price Checker", layout="wide")
+# st.set_page_config() now lives in app/Home.py -- see that file's docstring.
 
 
 @st.cache_resource

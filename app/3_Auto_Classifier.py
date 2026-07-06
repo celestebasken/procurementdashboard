@@ -15,8 +15,9 @@ _all_gates_match) so a campus benefits from what every OTHER campus has
 already classified, per CLAUDE.md's note that product_aliases is "probably
 the single highest-leverage table in the project."
 
-Standalone for now, like the other pages in this rebuild -- run directly
-with `streamlit run app/3_Auto_Classifier.py`.
+Part of the unified app/Home.py multi-page shell (also still runnable
+standalone via `streamlit run app/3_Auto_Classifier.py` for local
+debugging).
 """
 
 import sqlite3
@@ -31,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from lib.auto_classifier import CONFIDENT_MATCH, NEEDS_REVIEW, NO_MATCH, load_match_corpus, match_uploaded_products
 from lib.db import DEFAULT_DB_PATH
 
-st.set_page_config(page_title="Auto-Classifier", layout="wide")
+# st.set_page_config() now lives in app/Home.py -- see that file's docstring.
 
 
 @st.cache_resource

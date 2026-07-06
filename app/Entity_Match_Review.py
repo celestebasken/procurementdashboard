@@ -2,10 +2,15 @@
 product matches, both within a campus and across campuses
 (product_match_candidates.status='pending').
 
-Standalone for now -- run directly with `streamlit run app/Entity_Match_Review.py`.
-The shared multi-tab shell (global campus dropdown, Home.py) is Phase 5+ scope
-per CLAUDE.md's build phases (Roadmap page and beyond); this page doesn't need
-it since entity resolution is its own scoped workflow.
+Now part of the unified app/Home.py multi-page shell, under an "Admin"
+nav section -- kept separate from the 4 public-facing dashboard pages
+since it mutates canonical data (approving/rejecting merges) rather than
+just reading it. Also still runnable standalone via
+`streamlit run app/Entity_Match_Review.py` for local use. **If this app is
+ever deployed publicly (e.g. Render), this page should not be exposed
+without some form of access control** -- it has none today, matching every
+other page in this rebuild, which was a reasonable default when everything
+only ran locally.
 
 Approving a candidate calls lib.entity_matching.merge_products() -- the same
 merge path as auto-merge -- so both tiers share identical merge mechanics.
@@ -30,7 +35,7 @@ from lib.db import DEFAULT_DB_PATH
 from lib.entity_matching import merge_products
 from lib.ingestion import build_cert_lookup
 
-st.set_page_config(page_title="Entity Match Review", layout="wide")
+# st.set_page_config() now lives in app/Home.py -- see that file's docstring.
 
 
 @st.cache_resource

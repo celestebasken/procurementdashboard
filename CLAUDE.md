@@ -111,13 +111,13 @@ SQLite. Core tables:
 
 ## Front end
 
-Designed as one Streamlit app, multi-tab (`app/1_..._Roadmap.py`, `2_..._Dashboard.py`, etc.) — one URL, shared session state, not separate apps. **Current reality: each page is still standalone** (its own `streamlit run`, own port — see `.claude/launch.json`, ports 8501-8505), since a real multi-page shell hasn't been built yet. All 4 dashboard pages already read/write the same `st.session_state["selected_campus"]` key, so consolidating them later is mechanical, not a redesign.
+One real Streamlit multi-page app: `app/Home.py` is the single entry point (`st.navigation()` / `st.Page()`, Streamlit 1.58+), one URL, one shared session, not separate standalone apps. `st.set_page_config()` lives only in `Home.py` (it can only be called once per run). `.claude/launch.json` has a single `dashboard` config running `streamlit run app/Home.py` on port 8501. Every page file also still runs standalone (e.g. `streamlit run app/3_Auto_Classifier.py`) for local debugging — `st.Page()` executes a file-path page as a script, so each page's own `if __name__ == "__main__": main()` still fires normally either way.
 
 - `app/1_Campus_Roadmap.py` (Phase 5) — the 3 optimization scenarios + PDF report.
 - `app/2_Dining_Dashboard.py` (Phase 6) — cross-campus sustainable-product search.
 - `app/3_Auto_Classifier.py` (Phase 7) — upload-and-annotate, read-only.
 - `app/4_Competitive_Price_Checker.py` (Phase 8) — hypothetical-item re-optimization test.
-- `app/Entity_Match_Review.py` (Phase 2) — the entity-resolution human review queue.
+- `app/Entity_Match_Review.py` (Phase 2) — the entity-resolution human review queue. Grouped under a separate "Admin" nav section in `Home.py`, not alongside the 4 public-facing pages, since it mutates canonical data (approving/rejecting merges) rather than just reading it. **Has no access control today** — fine for local use, but if this app is ever deployed publicly (e.g. Render), this page needs some form of auth before that happens; it's the one page in the app that can change the shared database.
 
 **Global campus dropdown** in session state filters every tab by campus, feeding the same shared optimization function (campus as a parameter — not per-campus copies of the function). **Exception:** the Dining Dashboard tab is inherently cross-campus (its purpose is discovering what *other* campuses buy) — the dropdown there sets "my campus" as a reference point rather than hard-filtering results, and is also used to highlight/star search results available through a distributor the selected campus already uses (a query-time join against `purchases.vendor`, no schema change needed; `lib.dining_dashboard.get_campus_vendors()`).
 

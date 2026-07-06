@@ -31,10 +31,10 @@ legacy/dining_dashboard/app.py -- read for logic only, per CLAUDE.md, and
 that credential should be treated as compromised/rotated, not reused here)
 to match every other page in this rebuild, none of which has an auth gate.
 
-Standalone for now, like app/1_Campus_Roadmap.py -- run directly with
-`streamlit run app/2_Dining_Dashboard.py`. Reuses the same
-st.session_state["selected_campus"] key as the Roadmap page so the two
-pages agree once a shared multi-tab shell exists.
+Part of the unified app/Home.py multi-page shell (also still runnable
+standalone via `streamlit run app/2_Dining_Dashboard.py` for local
+debugging). Reuses the same st.session_state["selected_campus"] key as the
+Roadmap page, so the two now genuinely agree within one session.
 """
 
 import sqlite3
@@ -50,7 +50,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from lib.db import DEFAULT_DB_PATH
 from lib.dining_dashboard import get_campus_vendors, load_certification_types, load_sustainable_products
 
-st.set_page_config(page_title="Dining Dashboard", layout="wide")
+# st.set_page_config() now lives in app/Home.py -- see that file's docstring.
 
 REFERENCE_DIR = Path(__file__).resolve().parent.parent / "reference"
 SIMAP_CATEGORIES_PATH = REFERENCE_DIR / "simap_categories.csv"
