@@ -1,4 +1,5 @@
-"""Phase 7: Auto-Classifier page.
+"""Phase 7: Auto-Classifier page (displayed in the app as "Sustainability
+Auto-Reporting" -- internal module/file name unchanged).
 
 CLAUDE.md's exact spec: "campus uploads a purchasing sheet, gets
 sustainability_certifications auto-filled by matching against previously
@@ -62,13 +63,12 @@ def _read_uploaded_file(uploaded_file) -> pd.DataFrame | None:
 
 
 def main() -> None:
-    st.title("Auto-Classifier")
+    st.title("Sustainability Auto-Reporting")
     st.markdown(
         "Upload a purchasing sheet and get it back with sustainability certifications, validated sustainable "
         "status, and SIMAP category **auto-filled wherever a confident match is found** against every product "
-        "any UC campus has already classified. **Read-only**: this never changes anything in the shared "
-        "database -- it's a lookup pass on your own file, meant to help before you order, not a way to submit "
-        "new purchasing data (that still goes through the normal per-campus ingestion pipeline)."
+        "any UC campus has already classified. **Read-only**: to submit data for use in the UC-wide dataset, "
+        "please see the page \"Data Sources\"."
     )
 
     with st.expander("How matching works"):

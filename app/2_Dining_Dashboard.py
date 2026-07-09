@@ -48,13 +48,9 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lib.db import DEFAULT_DB_PATH
-from lib.dining_dashboard import get_campus_vendors, load_certification_types, load_sustainable_products
+from lib.dining_dashboard import get_campus_vendors, load_sustainable_products
 
 # st.set_page_config() now lives in app/Home.py -- see that file's docstring.
-
-REFERENCE_DIR = Path(__file__).resolve().parent.parent / "reference"
-SIMAP_CATEGORIES_PATH = REFERENCE_DIR / "simap_categories.csv"
-PDF_GUIDE_PATH = REFERENCE_DIR / "Brief_guide_on_UC_Sustainable_Purchasing.pdf"
 
 _ALREADY_PURCHASING = "Already purchasing"
 _NEW_VIA_MY_VENDOR = "⭐ New — via a distributor you already use"
@@ -92,21 +88,6 @@ def _load_products() -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def _load_cert_types() -> pd.DataFrame:
-    return load_certification_types(get_conn())
-
-
-@st.cache_data(show_spinner=False)
-def _load_simap_csv_bytes() -> bytes:
-    return SIMAP_CATEGORIES_PATH.read_bytes()
-
-
-@st.cache_data(show_spinner=False)
-def _load_pdf_guide_bytes() -> bytes | None:
-    return PDF_GUIDE_PATH.read_bytes() if PDF_GUIDE_PATH.exists() else None
-
-
-@st.cache_data(show_spinner=False)
 def _load_campus_vendors(campus: str) -> set[str]:
     return get_campus_vendors(get_conn(), campus)
 
@@ -117,79 +98,6 @@ def _opportunity_label(row: pd.Series, my_campus: str, my_vendors: set[str]) -> 
     if my_vendors and set(row["vendors"]) & my_vendors:
         return _NEW_VIA_MY_VENDOR
     return ""
-
-
-def _render_about(cert_types_df: pd.DataFrame, simap_csv_bytes: bytes, pdf_guide_bytes: bytes | None) -> None:
-    with st.expander("About this tool, the definition of sustainable, and how food categories are determined"):
-        st.markdown(
-            "This tool combines validated-sustainable food purchasing data from UC campuses so chefs and "
-            "purchasing staff can find sustainable items another campus already buys -- ideally through a "
-            "distributor they already have a relationship with, making it easier to add to their own menu."
-        )
-
-        st.markdown("#### How we define \"sustainable\"")
-        st.markdown(
-            "> \"Each campus foodservice operation will strive to procure 25% sustainable food products by the "
-            "year 2030 as defined by AASHE STARS, and each health location foodservice operation will strive to "
-            "procure 30% sustainable food products by the year 2030 as defined by Practice Greenhealth, while "
-            "maintaining accessibility and affordability for all students and health location's foodservice "
-            "patrons.\"\n>\n"
-            "> — *University of California Policy on Sustainable Practices 2024, Part H (Page 18)*"
-        )
-        st.markdown(
-            "This tool follows that policy directly: a product only counts as \"sustainable\" here if it carries "
-            "a certification recognized under the applicable standard for that kind of campus -- never a "
-            "campus's own judgment call."
-        )
-
-        st.markdown("#### Eligible sustainability certifications from AASHE STARS and/or PGH")
-        st.markdown(
-            "- **AASHE STARS** -- the Association for the Advancement of Sustainability in Higher Education's "
-            "Sustainability Tracking, Assessment & Rating System, the standard academic (non-health) UC campuses "
-            "report sustainable food purchasing against. [stars.aashe.org](https://stars.aashe.org/)\n"
-            "- **Practice Greenhealth (PGH)** -- specifically its Healthy Food in Health Care purchasing "
-            "standard, used by UC Health locations. "
-            "[practicegreenhealth.org/topics/food](https://practicegreenhealth.org/topics/food)"
-        )
-        st.dataframe(
-            cert_types_df.rename(
-                columns={
-                    "certification_name": "Certification",
-                    "abbreviation": "Abbreviation",
-                    "frameworks": "Recognized under",
-                    "qualifier": "Notes / restrictions",
-                }
-            ),
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        st.markdown("#### How food categories are determined (SIMAP)")
-        st.markdown(
-            "Every product here is grouped by SIMAP-57 category instead of a hand-maintained spreadsheet "
-            "category. SIMAP (the Sustainability Indicator Management & Analysis Platform) is a widely-used "
-            "higher-ed greenhouse-gas accounting tool; its 57-category food framework is what this project uses "
-            "to group similar foods and estimate emissions. SIMAP category is purely an organizational/GHG tool "
-            "here -- it never determines whether a product counts as \"sustainable\" (that's always the AASHE "
-            "STARS / Practice Greenhealth certification status described above)."
-        )
-        st.download_button(
-            "📥 Download SIMAP-57 category reference (CSV)",
-            data=simap_csv_bytes,
-            file_name="simap_categories.csv",
-            mime="text/csv",
-        )
-
-        st.markdown("#### Guide: Brief Guide on UC Sustainable Purchasing")
-        if pdf_guide_bytes:
-            st.download_button(
-                "📥 Download the guide (PDF)",
-                data=pdf_guide_bytes,
-                file_name="Brief_guide_on_UC_Sustainable_Purchasing.pdf",
-                mime="application/pdf",
-            )
-        else:
-            st.caption("Guide PDF not found.")
 
 
 def _render_search_tab(df: pd.DataFrame, my_campus: str, my_vendors: set[str]) -> None:
@@ -352,10 +260,13 @@ def main() -> None:
     conn = get_conn()
     st.title("Dining Dashboard")
     st.markdown(
-        "Search validated-sustainable products purchased across every UC campus, organized by SIMAP-57 category "
-        "instead of a hand-maintained spreadsheet category -- so chefs can find sustainable items to onboard "
-        "through distributors they may already use. **Select your campus from the sidebar at left, then search "
-        "for new products by category or distributor to help grow your campus's sustainable purchasing.**"
+        "Search "
+        "<a href='/our-definition-of-sustainable' target='_self'>validated-sustainable</a>"
+        " products purchased across every UC "
+        "campus -- so chefs can find sustainable items to onboard through distributors they may already use. "
+        "<strong>Select your campus from the sidebar at left, then search for new products by category or "
+        "distributor to help grow your campus's sustainable purchasing.</strong>",
+        unsafe_allow_html=True,
     )
 
     campuses = [r[0] for r in conn.execute("SELECT campus FROM campuses ORDER BY campus").fetchall()]
@@ -375,10 +286,7 @@ def main() -> None:
         )
 
     df = _load_products()
-    cert_types_df = _load_cert_types()
     my_vendors = _load_campus_vendors(my_campus)
-
-    _render_about(cert_types_df, _load_simap_csv_bytes(), _load_pdf_guide_bytes())
 
     if df.empty:
         st.warning("No validated-sustainable products found in the database yet.")

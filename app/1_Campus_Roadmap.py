@@ -8,18 +8,21 @@ CLAUDE.md's Phase 8 (Competitive Price Checker), a separate future page:
 
   - Min Spend, keeping sustainable spend at or above baseline.
   - Max Sustainable Spend, keeping cost at or below baseline.
-  - Threshold-then-maximize: locks in only 1/3 of whatever cost cut
-    Scenario 1 found achievable (project owner's exact spec -- e.g.
-    Scenario 1 finds 9% possible, Scenario 3 commits to 3%), then
-    maximizes sustainable spend under that more conservative cap.
+  - Achieve a Given Cost Reduction, Then Maximize: the user picks a cost-
+    reduction target via a sidebar slider (default 1/3 of whatever cut
+    Scenario 1 finds achievable, capped at that same achievable max --
+    was hardcoded to exactly 1/3 with no user control, made adjustable
+    per project owner request), then maximizes sustainable spend under
+    that target. Calls lib.optimization.solve_cost_target_then_maximize
+    directly with the slider's value.
 
-Reallocation is bounded two ways (added this session, per project owner
-direction): each SIMAP category may only move +/-20% from its own
-baseline weight, AND the total weight within each food group (see
-reference/food_groups.csv -- e.g. all meat/poultry/seafood/plant-protein
-together) is held fixed, so cutting beef can only shift weight to a
-reasonable substitute (chicken, tofu) within its own group, never to an
-unrelated category like apples.
+Reallocation is bounded two ways, both adjustable in the sidebar
+(default +/-15% each): each SIMAP category may only move that much from
+its own baseline weight, AND each food group (see reference/food_groups.csv
+-- e.g. all meat/poultry/seafood/plant-protein together) may only move
+that much from its own baseline total, so cutting beef can only shift
+weight to a reasonable substitute (chicken, tofu) within its own group,
+never to an unrelated category like apples.
 
 Also generates the PDF report (lib.pdf_report) for the current snapshot
 and/or whichever scenario was last run.
@@ -52,9 +55,9 @@ from lib.optimization import (
     build_category_baseline,
     identify_category_movers,
     snapshot_totals,
+    solve_cost_target_then_maximize,
     solve_max_sustainable_keep_cost,
     solve_min_spend_keep_sustainability,
-    solve_threshold_third_of_scenario1,
 )
 from lib.pdf_report import generate_pdf_report
 
@@ -65,7 +68,7 @@ from lib.pdf_report import generate_pdf_report
 SCENARIOS = {
     "Min Spend (keep sustainability floor)": "min_spend",
     "Max Sustainable Spend (keep cost cap)": "max_sustainable",
-    "Threshold (1/3 of Scenario 1) then Maximize": "threshold_third",
+    "Achieve a Given Cost Reduction, Then Maximize": "cost_target",
 }
 
 
@@ -92,6 +95,31 @@ def _fmt_pct_from_fraction(x: float) -> str:
 def _load_baseline(campus: str, fiscal_year: int) -> pd.DataFrame:
     conn = get_conn()
     return build_category_baseline(conn, campus, fiscal_year)
+
+
+@st.cache_data(show_spinner="Computing Scenario 1's achievable cost reduction...")
+def _scenario1_max_cut_pct(
+    campus: str,
+    fiscal_year: int,
+    category_lower_multiplier: float,
+    category_upper_multiplier: float,
+    group_lower_multiplier: float,
+    group_upper_multiplier: float,
+) -> float | None:
+    """The cost-reduction % Scenario 1 (min spend, keep sustainability
+    floor) actually achieves under the current bounds -- the ceiling for
+    the "Achieve a Given Cost Reduction" scenario's slider. Returns None
+    if Scenario 1 itself is infeasible under these bounds (the third
+    scenario would be too, so the caller should surface that instead of
+    showing a slider)."""
+    baseline_df = _load_baseline(campus, fiscal_year)
+    try:
+        scenario1 = solve_min_spend_keep_sustainability(
+            baseline_df, category_lower_multiplier, category_upper_multiplier, group_lower_multiplier, group_upper_multiplier
+        )
+    except InfeasibleScenarioError:
+        return None
+    return max(-scenario1.totals["cost_pct_change"], 0.0)
 
 
 def _render_snapshot(baseline_df: pd.DataFrame, campus: str, fiscal_year: int) -> None:
@@ -350,31 +378,38 @@ def _render_food_group_charts(result) -> None:
 def main() -> None:
     conn = get_conn()
     st.title("Campus Roadmap")
-    st.caption("🧪 Beta -- a planning tool to support conversations with your purchasing team, not a final decision.")
     st.markdown(
-        "This page models three ways a campus could shift its food purchasing toward more certified-sustainable "
-        "options (AASHE STARS for academic campuses, Practice Greenhealth for health systems), starting from that "
-        "campus's actual purchasing data for the year:\n\n"
-        "- **Min Spend** -- the cheapest way to buy the same amount of food while keeping at least today's level "
-        "of sustainable spending.\n"
-        "- **Max Sustainable Spend** -- the most sustainable mix of purchases possible without spending more than "
-        "today.\n"
-        "- **Threshold (1/3 of Scenario 1) then Maximize** -- a smaller, more conservative version of Min Spend's "
-        "savings, with the rest of that budget redirected toward sustainable purchasing.\n\n"
-        "To keep recommendations realistic, the model only swaps foods for close substitutes (beef for chicken, "
-        "not beef for apples) and limits how much any single food or food group can shift -- 15% by default, "
-        "adjustable in the sidebar. It won't suggest overhauling a kitchen's purchasing overnight."
-    )
-    st.caption(
-        "Technical note: \"sustainable\" here always means AASHE STARS / Practice Greenhealth certification "
-        "status (validated_sustainable_yn), never SIMAP category membership -- SIMAP-57 is used only to group "
-        "similar foods and estimate greenhouse-gas impact. The numbers below come from real purchasing records, "
-        "which aren't perfect: some purchases are missing a category or a weight, and a small number of corrupted "
-        "entries (e.g. distributor data errors) are automatically detected and excluded -- both are called out "
-        "below wherever they apply."
+        "Roadmaps are suggested optimizations for how a campus can shift the basket of goods that they purchase "
+        "to cut costs while increasing sustainable spend. These roadmaps are designed to help UC campuses meet "
+        "the sustainable procurement goals set out by the UC Sustainable Practices Policy (see the page \"Our "
+        "Definition of Sustainable\" for more information). The \"optimization\" analyzes how realistic, bounded "
+        "alterations to the frequency of purchasing within food categories in order to:\n\n"
+        "- **Minimize spend**: this is the cheapest way to buy the same amount of food while keeping at least "
+        "today's level of sustainable spending.\n"
+        "- **Maximize sustainable spend**: this is the most sustainable mix of purchases possible without "
+        "spending more than today.\n"
+        "- **Achieve a given cost reduction, and then maximize sustainable spend**: this is a smaller, more "
+        "conservative version that first minimizes spend to a feasible level, and then directs the rest of that "
+        "budget toward sustainable purchasing.\n\n"
+        "All three options stem from that campus's actual purchasing data. To keep recommendations realistic, "
+        "the model only swaps foods for close substitutes (beef for chicken, not beef for apples) and limits how "
+        "much any single food or food group can shift -- 15% by default, adjustable in the sidebar within food "
+        "categories (ie beef) and food groups (ie meat). It won't suggest overhauling a kitchen's purchasing "
+        "overnight."
     )
 
-    campuses = [r[0] for r in conn.execute("SELECT campus FROM campuses ORDER BY campus").fetchall()]
+    # Only FY2025 exists right now, so the fiscal-year widget is hidden
+    # rather than shown with nothing to choose -- re-add once more years
+    # of data land.
+    fiscal_year = 2025
+
+    # Only campuses with actual FY2025 purchasing data -- the `campuses`
+    # reference table has all 14 UC campuses (by design, so the schema
+    # tolerates one with zero purchases rows), but listing campuses with
+    # no data here just confuses a stakeholder picking from the dropdown.
+    campuses = [
+        r[0] for r in conn.execute("SELECT DISTINCT campus FROM purchases WHERE fiscal_year = ? ORDER BY campus", (fiscal_year,)).fetchall()
+    ]
     default_campus = "UC Davis" if "UC Davis" in campuses else campuses[0]
 
     with st.sidebar:
@@ -383,15 +418,8 @@ def main() -> None:
             "Campus", campuses, index=campuses.index(st.session_state.get("selected_campus", default_campus))
         )
         st.session_state["selected_campus"] = campus
-        fiscal_year = st.number_input("Fiscal year", value=2025, step=1)
 
         st.divider()
-        scenario_label = st.radio("Scenario", list(SCENARIOS.keys()))
-        scenario = SCENARIOS[scenario_label]
-        if scenario == "threshold_third":
-            st.caption("Cost-reduction target is derived automatically -- 1/3 of Scenario 1's achievable cut.")
-
-        st.caption("Category and food-group bounds nest inside a fixed global total weight (see module docstring).")
         category_pct = st.slider(
             "Max % change allowed per SIMAP category", 0, 100, int((1 - CATEGORY_LOWER_MULTIPLIER_DEFAULT) * 100)
         )
@@ -402,6 +430,33 @@ def main() -> None:
         category_upper_multiplier = 1 + category_pct / 100
         group_lower_multiplier = 1 - group_pct / 100
         group_upper_multiplier = 1 + group_pct / 100
+
+        st.divider()
+        scenario_label = st.radio("Scenario", list(SCENARIOS.keys()))
+        scenario = SCENARIOS[scenario_label]
+
+        cost_reduction_target_pct = 0.0
+        if scenario == "cost_target":
+            max_cut_pct = _scenario1_max_cut_pct(
+                campus, fiscal_year, category_lower_multiplier, category_upper_multiplier, group_lower_multiplier, group_upper_multiplier
+            )
+            if max_cut_pct is None:
+                st.caption(
+                    "Scenario 1 is infeasible under the current bounds, so no cost reduction target can be "
+                    "computed -- try loosening the category/food-group bounds above."
+                )
+            elif max_cut_pct <= 0:
+                st.caption("Scenario 1 finds no cost reduction achievable under the current bounds.")
+            else:
+                st.caption(f"The maximum cost cutting available (per Scenario 1) is **{max_cut_pct:.1f}%**.")
+                cost_reduction_target_pct = st.slider(
+                    "Desired cost reduction (%)",
+                    min_value=0.0,
+                    max_value=max_cut_pct,
+                    value=max_cut_pct / 3,
+                    step=0.1,
+                    key=f"cost_reduction_target_pct_{campus}",
+                )
 
         run_clicked = st.button("Run Optimization", type="primary", use_container_width=True)
 
@@ -427,7 +482,8 @@ def main() -> None:
             elif scenario == "max_sustainable":
                 result = solve_max_sustainable_keep_cost(baseline_df, *bound_args)
             else:
-                result = solve_threshold_third_of_scenario1(baseline_df, *bound_args)
+                result = solve_cost_target_then_maximize(baseline_df, cost_reduction_target_pct / 100, *bound_args)
+                result.scenario_name = f"Cost Reduction Target ({cost_reduction_target_pct:.1f}%), Then Maximize"
             st.session_state[state_key] = result
         except InfeasibleScenarioError as e:
             st.error(str(e))
