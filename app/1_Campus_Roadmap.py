@@ -381,21 +381,23 @@ def main() -> None:
     st.markdown(
         "Roadmaps are suggested optimizations for how a campus can shift the basket of goods that they purchase "
         "to cut costs while increasing sustainable spend. These roadmaps are designed to help UC campuses meet "
-        "the sustainable procurement goals set out by the UC Sustainable Practices Policy (see the page \"Our "
-        "Definition of Sustainable\" for more information). The \"optimization\" analyzes how realistic, bounded "
-        "alterations to the frequency of purchasing within food categories in order to:\n\n"
-        "- **Minimize spend**: this is the cheapest way to buy the same amount of food while keeping at least "
-        "today's level of sustainable spending.\n"
-        "- **Maximize sustainable spend**: this is the most sustainable mix of purchases possible without "
-        "spending more than today.\n"
-        "- **Achieve a given cost reduction, and then maximize sustainable spend**: this is a smaller, more "
-        "conservative version that first minimizes spend to a feasible level, and then directs the rest of that "
-        "budget toward sustainable purchasing.\n\n"
+        "the <a href='/our-definition-of-sustainable' target='_self'>sustainable procurement goals</a> set out "
+        "by the UC Sustainable Practices Policy. The \"optimization\" analyzes realistic, bounded alterations "
+        "to the frequency of purchasing <a href='/food-categories-and-ghg' target='_self'>within food "
+        "categories</a> in order to:\n\n"
+        "- <strong>Minimize spend</strong>: this is the cheapest way to buy the same amount of food while "
+        "keeping at least today's level of sustainable spending.\n"
+        "- <strong>Maximize sustainable spend</strong>: this is the most sustainable mix of purchases possible "
+        "without spending more than today.\n"
+        "- <strong>Achieve a given cost reduction, and then maximize sustainable spend</strong>: this is a "
+        "smaller, more conservative version that first minimizes spend to a feasible level, and then directs "
+        "the rest of that budget toward sustainable purchasing.\n\n"
         "All three options stem from that campus's actual purchasing data. To keep recommendations realistic, "
         "the model only swaps foods for close substitutes (beef for chicken, not beef for apples) and limits how "
         "much any single food or food group can shift -- 15% by default, adjustable in the sidebar within food "
         "categories (ie beef) and food groups (ie meat). It won't suggest overhauling a kitchen's purchasing "
-        "overnight."
+        "overnight.",
+        unsafe_allow_html=True,
     )
 
     # Only FY2025 exists right now, so the fiscal-year widget is hidden

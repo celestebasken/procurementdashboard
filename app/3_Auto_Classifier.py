@@ -35,6 +35,8 @@ from lib.db import DEFAULT_DB_PATH
 
 # st.set_page_config() now lives in app/Home.py -- see that file's docstring.
 
+TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "reference" / "sustainability_auto_reporting_template.csv"
+
 
 @st.cache_resource
 def get_conn() -> sqlite3.Connection:
@@ -46,6 +48,11 @@ def get_conn() -> sqlite3.Connection:
 @st.cache_data(show_spinner=False)
 def _load_corpus() -> pd.DataFrame:
     return load_match_corpus(get_conn())
+
+
+@st.cache_data(show_spinner=False)
+def _load_template_bytes() -> bytes:
+    return TEMPLATE_PATH.read_bytes()
 
 
 def _read_uploaded_file(uploaded_file) -> pd.DataFrame | None:
@@ -83,6 +90,23 @@ def main() -> None:
             "worth a quick human look before trusting it.\n"
             f"- **{NO_MATCH}** -- nothing in the existing data was a good enough match. This means \"we don't "
             "know yet,\" not \"not sustainable.\""
+        )
+
+    with st.expander("Not sure what to upload? Download a template"):
+        st.markdown(
+            "Any spreadsheet works, in any layout -- you'll pick which column has the product name after "
+            "uploading. The only thing that matters is how descriptive that column's text is: a name like "
+            "\"BEEF, GROUND 80/20 BRICK FROZEN 5#\" (pack size, cut, and format included, the way a "
+            "distributor writes it) matches far better than a bare \"Beef\", since the matcher checks pack "
+            "size, origin, and several other details against the existing data before accepting a match. This "
+            "template shows one reasonable layout -- feel free to add, remove, or rename columns; only the "
+            "product name column matters."
+        )
+        st.download_button(
+            "📥 Download template (CSV)",
+            data=_load_template_bytes(),
+            file_name="sustainability_auto_reporting_template.csv",
+            mime="text/csv",
         )
 
     uploaded_file = st.file_uploader("Upload a purchasing sheet", type=["csv", "xlsx", "xls"])

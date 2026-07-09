@@ -20,8 +20,10 @@ def main() -> None:
     st.title("Data Sources")
     st.markdown(
         "All data was shared by campuses and is from the Fiscal 2025 year (July 1, 2024 through June 30, "
-        "2025). Data does not include public-facing prices; however, it is still privately shared, as this is "
-        "an internal UC resource.\n\n"
+        "2025). All price data is not shared explicitly in this tool, and this resource is exclusively for "
+        "internal use. However, the data must include prices to be usable for the roadmap and price-checker "
+        "tools. Price-free data can be included in the dining dashboard and sustainability auto-reporting "
+        "tool.\n\n"
         "Thank you so much to the campuses that contributed their data for this tool. If you spot any errors "
         "in the data or the dashboard overall, we would be grateful if you would share them with Celeste.\n\n"
         "If you would like to submit, edit, or remove any data, either for FY2025 or another time, please "

@@ -45,7 +45,8 @@ def _render_home() -> None:
     st.markdown(
         "This is the <u>beta</u> version of a combined UC Sustainability Dining dashboard. It incorporates "
         "<a href='/data-sources' target='_self'>systemwide data</a> to help UC plan for the future and meet "
-        "its sustainability goals, while improving the ease of reporting and procurement. This tool is meant "
+        "its <a href='/our-definition-of-sustainable' target='_self'>sustainability goals</a>, while improving "
+        "the ease of reporting and procurement. This tool is meant "
         "for internal use by a variety of stakeholders — chefs, procurement, sustainability, business, "
         "students, and others who care about improving dining. For questions or suggestions please send "
         "feedback to Celeste Basken at "
@@ -95,14 +96,6 @@ def _render_home() -> None:
             "given campus."
         )
         st.page_link("4_Competitive_Price_Checker.py", label="Open Price Checker", icon="💲")
-
-    st.divider()
-    st.caption(
-        "\"Sustainable\" always means `products.validated_sustainable_yn` (AASHE STARS for academic campuses, "
-        "Practice Greenhealth for health systems) -- never SIMAP category membership, which is used only to "
-        "group similar foods and estimate greenhouse-gas impact. See \"Our Definition of Sustainable\" in the "
-        "sidebar for the full policy."
-    )
 
 
 home_page = st.Page(_render_home, title="Home", icon="🏠", url_path="home", default=True)
