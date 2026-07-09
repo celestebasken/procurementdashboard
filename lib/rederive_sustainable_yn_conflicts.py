@@ -37,8 +37,9 @@ from lib.db import get_connection
 from lib.entity_matching import _all_gates_match, _score_matrix, AUTO_MERGE_THRESHOLD, merge_products, normalize_vendor
 from lib.ingestion import CAMPUS_FILES, CAMPUS_LOADERS, DATA_RAW_DIR, build_cert_lookup, insert_product_and_purchase
 
-AUDIT_CSV = Path(__file__).resolve().parent.parent / "data" / "processed" / "sustainable_yn_conflict_audit.csv"
-LOG_CSV = Path(__file__).resolve().parent.parent / "data" / "processed" / "sustainable_yn_conflict_rederivation_log.csv"
+_REVIEW_DIR = Path(__file__).resolve().parent.parent / "data" / "processed" / "entity_matching_review"
+AUDIT_CSV = _REVIEW_DIR / "sustainable_yn_conflict_audit.csv"
+LOG_CSV = _REVIEW_DIR / "sustainable_yn_conflict_rederivation_log.csv"
 
 FISCAL_YEAR = 2025
 

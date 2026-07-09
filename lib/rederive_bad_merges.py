@@ -1,5 +1,5 @@
 """One-time targeted repair for the 24 products flagged in
-data/processed/bad_merges_needing_rederivation.csv as auto-merged before
+data/processed/entity_matching_review/bad_merges_needing_rederivation.csv as auto-merged before
 lib.entity_matching's _numbers_match/_origins_match guards existed or were
 complete (see CLAUDE.md, "Known data-integrity issue"). Their purchases
 rows are already summed and can't be split back apart by guessing, so for
@@ -41,11 +41,10 @@ from lib.db import get_connection
 from lib.entity_matching import find_and_merge_within_campus, merge_products
 from lib.ingestion import CAMPUS_FILES, CAMPUS_LOADERS, DATA_RAW_DIR, build_cert_lookup, insert_product_and_purchase
 
-BAD_MERGES_CSV = Path(__file__).resolve().parent.parent / "data" / "processed" / "bad_merges_needing_rederivation.csv"
-LOG_CSV = Path(__file__).resolve().parent.parent / "data" / "processed" / "rederivation_log.csv"
-REMOVED_CANDIDATES_CSV = (
-    Path(__file__).resolve().parent.parent / "data" / "processed" / "rederivation_removed_candidates.csv"
-)
+_REVIEW_DIR = Path(__file__).resolve().parent.parent / "data" / "processed" / "entity_matching_review"
+BAD_MERGES_CSV = _REVIEW_DIR / "bad_merges_needing_rederivation.csv"
+LOG_CSV = _REVIEW_DIR / "rederivation_log.csv"
+REMOVED_CANDIDATES_CSV = _REVIEW_DIR / "rederivation_removed_candidates.csv"
 
 FISCAL_YEAR = 2025
 

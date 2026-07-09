@@ -28,8 +28,8 @@ For every (product_id_a, product_id_b) pair with more than one row:
 Backs up the db file first (plain file copy, not a schema migration) and
 runs the deletes inside a single transaction so a crash mid-run can't leave
 the table half-cleaned. Every row this script removes is logged to
-data/processed/ for audit before deletion. Supports --dry-run to preview
-what would be removed without writing anything.
+data/processed/entity_matching_review/ for audit before deletion. Supports
+--dry-run to preview what would be removed without writing anything.
 
 Do NOT run this against the live database without an explicit go-ahead --
 as of this writing the project owner is actively reviewing the queue via
@@ -48,7 +48,8 @@ from pathlib import Path
 from lib.db import DEFAULT_DB_PATH
 
 REMOVED_LOG_CSV = (
-    Path(__file__).resolve().parent.parent / "data" / "processed" / "dedupe_stale_candidates_removed.csv"
+    Path(__file__).resolve().parent.parent
+    / "data" / "processed" / "entity_matching_review" / "dedupe_stale_candidates_removed.csv"
 )
 
 _CANDIDATE_COLUMNS = [

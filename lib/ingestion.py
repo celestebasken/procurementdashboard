@@ -2333,6 +2333,7 @@ def ingest_all(
         results[abbrev] = stats
 
     if non_food_log_path is not None and non_food_rows:
+        non_food_log_path.parent.mkdir(parents=True, exist_ok=True)
         pd.concat(non_food_rows, ignore_index=True).to_csv(non_food_log_path, index=False)
 
     return results
@@ -2343,7 +2344,7 @@ if __name__ == "__main__":
 
     conn = get_connection()
     init_db(conn)
-    non_food_log = DATA_RAW_DIR.parent / "processed" / "non_food_removed.csv"
+    non_food_log = DATA_RAW_DIR.parent / "processed" / "ingestion_and_classification_review" / "non_food_removed.csv"
     results = ingest_all(conn, non_food_log_path=non_food_log)
     for campus, stats in results.items():
         weight_stats = conn.execute(

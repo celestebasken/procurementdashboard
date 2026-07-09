@@ -19,7 +19,7 @@ to one sustainable_yn value. Cross-campus merges never reconcile multiple
 same-campus raw names against each other, so they're not in scope here.
 
 This is audit-only -- it does not modify the database. Writes findings to
-data/processed/sustainable_yn_conflict_audit.csv for review.
+data/processed/entity_matching_review/sustainable_yn_conflict_audit.csv for review.
 """
 
 import csv
@@ -30,7 +30,10 @@ import pandas as pd
 from lib.db import get_connection
 from lib.ingestion import CAMPUS_FILES, CAMPUS_LOADERS, DATA_RAW_DIR
 
-AUDIT_CSV = Path(__file__).resolve().parent.parent / "data" / "processed" / "sustainable_yn_conflict_audit.csv"
+AUDIT_CSV = (
+    Path(__file__).resolve().parent.parent
+    / "data" / "processed" / "entity_matching_review" / "sustainable_yn_conflict_audit.csv"
+)
 
 
 def _campus_abbrev(conn, campus_name: str) -> str:
