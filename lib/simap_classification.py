@@ -235,15 +235,135 @@ def _apply_plant_based_override(canonical_name: str, category: str | None) -> tu
     return None
 
 
-def keyword_match(name: str, dictionary: dict[str, str]) -> str | None:
-    """Longest matching dictionary keyword wins (more specific phrases like
-    'Baked Goods' beat generic single words when both appear). Ties on
-    length are broken by earliest position in the text -- e.g. "CHICKEN
-    BREAST BUFFALO BITES" has "Chicken" and "Buffalo" both length 7, and the
-    first-mentioned ingredient is usually the primary one (Poultry, not the
-    "Buffalo" sauce/flavor descriptor) -- found via real-data audit, not
-    just this one example: it's a general product-naming pattern (lead
-    noun first, flavor/style descriptors after)."""
+# Bare fruit/produce names that keyword_match will confidently pick up as a
+# FLAVOR descriptor of an unrelated processed product (a soda, candy, tea,
+# yogurt, protein bar...) rather than the fruit itself, since the fruit
+# word is usually longer than the actual product-type word next to it
+# (e.g. "SODA DR PEPPER BLACKBERRY" -- "Blackberry" (10 chars) beats "Soda"
+# (4 chars) under the longest-match rule). Deliberately excludes words that
+# are ALSO reliable category-defining keywords in their own right (Cookie,
+# Chocolate, Candy, Cheese, Chicken, Cereal, Tea, Juice, Water, Yogurt,
+# Vanilla, Potato, Almond, ...) -- those aren't in scope here since
+# overriding them would risk breaking genuinely correct classifications
+# (a real chocolate bar IS Cocoa; excluding "Chocolate" too would have
+# produced false unclassifications there). Scope confirmed empirically:
+# zero false positives found in Cocoa/Vegetables (misc.)/Stimulants &
+# Spices (misc.) when checked against this exact keyword set.
+_FLAVOR_PRONE_PRODUCE_KEYWORDS = {
+    "berry", "blackberry", "raspberry", "cranberry", "blueberry", "strawberry", "grape",
+    "coconut", "peach", "pear", "apple", "mango", "cherry", "lemon", "lime", "orange",
+    "grapefruit", "banana", "pineapple",
+}
+
+# Presence of any of these alongside a _FLAVOR_PRONE_PRODUCE_KEYWORDS match
+# is the actual signal that word is a flavor, not the product -- audited
+# against the real live db before finalizing this list: this exact set
+# correctly flagged 607 real flavor-word false positives across Berries
+# (112), Fruits (misc.) (387), Citrus Fruit (90), and Sugars and
+# sweeteners (18), with zero misfires spot-checked across the full lists.
+_NON_PRODUCE_PRODUCT_SIGNAL_RE = re.compile(
+    r"\b("
+    r"bar|candy|gum|cookie|cookies|donut|pastry|danish|scone|dessert|"
+    r"gelato|sorbet|sorbetto|jam|preserves|syrup|topping|sauce|dressing|"
+    r"yogurt|drink|bev|juice|soda|tea|kombucha|water|snack|chew|"
+    r"granola|cereal|loaf|pie|tart|muffin|waffle|pancake|popsicle|"
+    r"gelatin|gummy|gummi|sandwich|salad|chip|chips|vinaigrette|"
+    r"hibiscus|energy|supplement|gatorlyte|gatorade|tums|smoothie|milkshake"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _apply_flavor_confusion_override(
+    canonical_name: str, category: str | None, source: str | None, dictionary: dict[str, str]
+) -> tuple[str | None, str] | None:
+    """Corrects products where a bare fruit name matched as a keyword, but
+    is actually a flavor of something else entirely -- e.g. "SODA DR PEPPER
+    BLACKBERRY CAN 12OZ" (matched "Blackberry", 10 chars, over "Soda", 4
+    chars) or "GATORLYTE MIXED BERRY 20OZ". Real audit examples found
+    kombucha, soda, candy, gum, cookies, yogurt, salad dressing, energy
+    drinks, and even a chicken-salad sandwich pulled into fruit categories
+    this way. Unlike _apply_plant_based_override, this does NOT try to
+    guess a replacement category (an earlier prototype that re-ran
+    keyword_match with the fruit word excluded just let a DIFFERENT flavor
+    word win instead -- e.g. "GUM ... BERRY LIME" became "Citrus Fruit" via
+    "Lime" -- trading one wrong answer for another). Downgrading to
+    unclassified is the honest outcome: nothing here confidently indicates
+    a real category, matching the project's established "unresolved over
+    guessed" philosophy.
+
+    Only fires when source == 'keyword_match' -- this bug lives entirely
+    in keyword_match's own longest-match tie-break, not in campus-reported
+    categories. Confirmed via live-db audit that applying this
+    unconditionally would wrongly downgrade 48 campus_category-sourced
+    products that are genuinely correct dominant-ingredient calls the
+    campus already made (e.g. "PEACH, DICED IN JUICE SS PLASTIC CUP" and
+    "JAM, GRAPE SS CUP SHELF STABLE" are real fruit/preserve products
+    campus_category already filed correctly -- "in juice"/"jam" happening
+    to also be in the exclusion-word list is a coincidence, not a sign of
+    a beverage/candy false positive, unlike the keyword_match-tier cases
+    this override actually targets).
+
+    Takes the dictionary as a parameter (rather than calling
+    load_dictionary() itself) since this runs once per product inside
+    classify_all()'s loop -- reloading the CSV from disk that often would
+    be needlessly slow."""
+    if source != "keyword_match":
+        return None
+    if category not in ("Berries", "Fruits (misc.)", "Citrus Fruit", "Sugars and sweeteners"):
+        return None
+    winning_keyword, _ = _best_match(canonical_name, dictionary)
+    if winning_keyword is None or winning_keyword.lower() not in _FLAVOR_PRONE_PRODUCE_KEYWORDS:
+        return None
+    if _NON_PRODUCE_PRODUCT_SIGNAL_RE.search(canonical_name):
+        return None, "unclassified"
+    return None
+
+
+_FRESH_BEAN_VARIETY_RE = re.compile(
+    r"\b(green\s?beans?|wax\s?beans?|romano\s?beans?|haricot|french\s?beans?|blue\s?lake\s?beans?|"
+    r"snap\s?beans?|string\s?beans?)\b",
+    re.IGNORECASE,
+)
+
+
+def _apply_fresh_bean_override(canonical_name: str, category: str | None) -> tuple[str | None, str] | None:
+    """"Beans and pulses (dried)" should only hold dry/pulse bean varieties
+    (black, pinto, kidney, garbanzo, navy, cannellini, lentil...) -- the
+    bare "Bean"/"Beans" keyword doesn't distinguish those from string/snap
+    bean varieties (green, wax, Romano, haricot vert, French, Blue Lake),
+    which are fresh vegetable-style beans regardless of trimmed/frozen/IQF
+    preparation state, never sold or accounted for as a dry pulse. Routes
+    to "Vegetables (misc.)" -- SIMAP-57 has no dedicated fresh-bean
+    category, and this matches how fresh/snap beans are conventionally
+    treated in food-category GHG accounting (as a vegetable crop, not a
+    pulse crop) -- confirmed 29 real examples via live-db audit (e.g.
+    "HARICOT BEANS FRENCH 10/1 LB (SUS)", "TRIMMED GREEN BEANS
+    *CALIFORNIA*"), zero false positives (dry-bean varieties like pinto/
+    black/kidney/garbanzo never match this pattern).
+
+    Deliberately applies regardless of classification source (unlike
+    _apply_flavor_confusion_override, which only fires for keyword_match).
+    18 of the 29 real matches are campus_category-sourced, but a fresh-
+    bean-variety name (e.g. "TRIMMED GREEN BEANS") has no legitimate
+    reading as a dried pulse under any campus's own department coding --
+    this is the same class of coarse-department-code bug _apply_plant_
+    based_override was built to correct, not a case of second-guessing a
+    genuine campus judgment call."""
+    if category != "Beans and pulses (dried)":
+        return None
+    if _FRESH_BEAN_VARIETY_RE.search(canonical_name):
+        return "Vegetables (misc.)", "keyword_match"
+    return None
+
+
+def _best_match(name: str, dictionary: dict[str, str]) -> tuple[str | None, str | None]:
+    """Returns (winning_keyword, category) -- the same longest-match/
+    earliest-position tie-break keyword_match() applies, just also
+    exposing which keyword won, needed by _apply_flavor_confusion_override
+    to check whether the winning keyword itself is a bare produce/fruit
+    name (as opposed to a keyword that's already reliable, like "Cookie"
+    -> Wheat/Rye or "Chicken" -> Poultry)."""
     best_keyword = None
     best_position = None
     for keyword in dictionary:
@@ -257,7 +377,19 @@ def keyword_match(name: str, dictionary: dict[str, str]) -> str | None:
         ):
             best_keyword = keyword
             best_position = match.start()
-    return dictionary[best_keyword] if best_keyword else None
+    return best_keyword, (dictionary[best_keyword] if best_keyword else None)
+
+
+def keyword_match(name: str, dictionary: dict[str, str]) -> str | None:
+    """Longest matching dictionary keyword wins (more specific phrases like
+    'Baked Goods' beat generic single words when both appear). Ties on
+    length are broken by earliest position in the text -- e.g. "CHICKEN
+    BREAST BUFFALO BITES" has "Chicken" and "Buffalo" both length 7, and the
+    first-mentioned ingredient is usually the primary one (Poultry, not the
+    "Buffalo" sauce/flavor descriptor) -- found via real-data audit, not
+    just this one example: it's a general product-naming pattern (lead
+    noun first, flavor/style descriptors after)."""
+    return _best_match(name, dictionary)[1]
 
 
 def classify_all(conn: sqlite3.Connection, data_dir: Path = DATA_RAW_DIR) -> dict:
@@ -293,7 +425,12 @@ def classify_all(conn: sqlite3.Connection, data_dir: Path = DATA_RAW_DIR) -> dic
         if category is None:
             source = "unclassified"
 
-        override = _apply_plant_based_override(group["canonical_name"].iloc[0], category)
+        name = group["canonical_name"].iloc[0]
+        override = _apply_plant_based_override(name, category)
+        if override is None:
+            override = _apply_flavor_confusion_override(name, category, source, dictionary)
+        if override is None:
+            override = _apply_fresh_bean_override(name, category)
         if override is not None:
             category, source = override
 

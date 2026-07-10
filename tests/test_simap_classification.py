@@ -5,6 +5,8 @@ import pytest
 
 from lib.db import init_db, migrate_schema
 from lib.simap_classification import (
+    _apply_flavor_confusion_override,
+    _apply_fresh_bean_override,
     _apply_plant_based_override,
     build_campus_category_lookup,
     classify_all,
@@ -235,6 +237,142 @@ def test_classify_all_applies_plant_based_override_end_to_end(conn, tmp_path):
     ).fetchone()
     assert row == ("Oat milk", "plant_based_override")
     assert counts["plant_based_override"] == 1
+
+
+# --------------------------------------------------------------------------
+# _apply_flavor_confusion_override
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "name,category",
+    [
+        # Real audit examples: a fruit-name keyword outlengths the actual
+        # product-type word, misclassifying a beverage/candy/snack/dressing
+        # as the fruit itself. All keyword_match-sourced.
+        ("SODA DR PEPPER BLACKBERRY CAN 12OZ", "Berries"),
+        ("GATORLYTE MIXED BERRY 20OZ", "Fruits (misc.)"),
+        ("GTS SYNERGY KOMBUCHA RASPBERRY CHIA 12 (16 OZ)", "Berries"),
+        ("CANDY SOUR PUNCH STRAWS BLUE RASPBERRY", "Berries"),
+        ("BIB Brisk Tea Raspberry 5 GL", "Berries"),
+        ("DRESSING ANNIES RASPBERRY VIN LF 8Z", "Berries"),
+        ("BIB Dole Orange Juice 3 GL", "Citrus Fruit"),
+        ("BANANA MUFFIN", "Fruits (misc.)"),
+        ("YOGURT RASPBERRY GREEK NF", "Berries"),
+    ],
+)
+def test_apply_flavor_confusion_override_downgrades_known_false_positives(name, category):
+    dictionary = load_dictionary()
+    assert _apply_flavor_confusion_override(name, category, "keyword_match", dictionary) == (None, "unclassified")
+
+
+@pytest.mark.parametrize(
+    "name,category",
+    [
+        # Genuine fruit/berry products -- no non-produce signal word present.
+        ("BLACKBERRY FRESH", "Berries"),
+        ("BLACKBERRY IQF", "Berries"),
+        ("CRANBERRIES 24/12 OZ (FRESH)", "Berries"),
+        ("BLUEBERRY, DMSTC WHL IQF FZN", "Berries"),
+    ],
+)
+def test_apply_flavor_confusion_override_leaves_real_produce_alone(name, category):
+    dictionary = load_dictionary()
+    assert _apply_flavor_confusion_override(name, category, "keyword_match", dictionary) is None
+
+
+def test_apply_flavor_confusion_override_does_not_touch_reliable_keywords():
+    # "Chocolate"/"Cookie"/"Candy" are themselves reliable category-defining
+    # keywords -- a real chocolate bar IS Cocoa, a real cookie IS
+    # Wheat/Rye. This override must not touch categories those keywords
+    # produce, even though "candy"/"cookie" are also in the exclusion word
+    # list used to detect fruit-flavor false positives.
+    dictionary = load_dictionary()
+    assert _apply_flavor_confusion_override("CANDY BAR MILK CHOCOLATE", "Cocoa", "keyword_match", dictionary) is None
+    assert (
+        _apply_flavor_confusion_override(
+            "COOKIE CHOCOLATE CHIP", "Wheat/Rye (Bread, pasta, baked goods)", "keyword_match", dictionary
+        )
+        is None
+    )
+
+
+def test_apply_flavor_confusion_override_ignores_categories_outside_scope():
+    dictionary = load_dictionary()
+    assert _apply_flavor_confusion_override("SODA GINGER ALE 12OZ", "Liquids", "keyword_match", dictionary) is None
+    assert (
+        _apply_flavor_confusion_override(
+            "CHICKEN SALAD SANDWICH", "Poultry (chicken, turkey)", "keyword_match", dictionary
+        )
+        is None
+    )
+
+
+def test_apply_flavor_confusion_override_never_fires_for_campus_category_source():
+    # The bug lives in keyword_match's own tie-break, not in campus-
+    # reported categories -- confirmed via live-db audit that 48 real
+    # campus_category-sourced products (genuine dominant-ingredient calls
+    # the campus already made correctly, e.g. diced peach canned "in
+    # juice", a grape "jam") would be wrongly downgraded if this override
+    # applied regardless of source. "JUICE ORANGE 100% CRTN" is real,
+    # correctly campus_category-classified pure orange juice -- must stay
+    # untouched even though "Orange" + "Juice" would otherwise trigger the
+    # override.
+    dictionary = load_dictionary()
+    assert _apply_flavor_confusion_override("JUICE ORANGE 100% CRTN", "Citrus Fruit", "campus_category", dictionary) is None
+    assert (
+        _apply_flavor_confusion_override(
+            "PEACH, DICED IN JUICE SS PLASTIC CUP", "Fruits (misc.)", "campus_category", dictionary
+        )
+        is None
+    )
+    assert (
+        _apply_flavor_confusion_override(
+            "JAM, GRAPE SS CUP SHELF STABLE", "Sugars and sweeteners", "campus_category", dictionary
+        )
+        is None
+    )
+
+
+# --------------------------------------------------------------------------
+# _apply_fresh_bean_override
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "HARICOT BEANS FRENCH 10/1 LB (SUS)",  # the exact reported example
+        "GREEN BEANS BLUE LAKE 25 LB",
+        "TRIMMED GREEN BEANS *CALIFORNIA*",
+        "TRIMMED YELLOW WAX BEANS 5#",
+        "TRIMMED ROMANO BEANS 5#",
+        "BLUELAKE BEANS POUND",
+        "BEAN GREEN WHL HARICOT VERT",
+    ],
+)
+def test_apply_fresh_bean_override_reroutes_string_bean_varieties(name):
+    assert _apply_fresh_bean_override(name, "Beans and pulses (dried)") == ("Vegetables (misc.)", "keyword_match")
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "BEAN GARBANZO DRIED",
+        "BEAN, PINTO WASHED DRIED SHELF STABLE BAG",
+        "DRIED BLACK TURTLE BEANS 25# (ORGANIC)",
+        "CANNED KIDNEY BEANS 6/#10",
+        # Reversed word order ("BEAN, GREEN" not "GREEN BEAN") isn't
+        # caught by this regex -- a known, narrow gap (same class of
+        # limitation as the milk/oat reversed-order case elsewhere in this
+        # file), not attempted here since it's a small minority of cases.
+        "BEAN, GREEN CHOPPED FROZEN SS CUP",
+    ],
+)
+def test_apply_fresh_bean_override_leaves_dried_pulse_varieties_alone(name):
+    assert _apply_fresh_bean_override(name, "Beans and pulses (dried)") is None
+
+
+def test_apply_fresh_bean_override_ignores_other_categories():
+    assert _apply_fresh_bean_override("HARICOT BEANS FRENCH", "Vegetables (misc.)") is None
 
 
 # --------------------------------------------------------------------------
