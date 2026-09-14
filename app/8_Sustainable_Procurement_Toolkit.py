@@ -62,7 +62,7 @@ def _load_toolkit_pdf_bytes() -> bytes | None:
 def main() -> None:
     st.title("Sustainable Procurement Toolkit")
     st.markdown(
-        "This toolkit was designed for anyone working to make food procurement at their campus more "
+        "This toolkit is designed for anyone working to make food procurement at their campus more "
         "sustainable, whether they are starting from zero or already actively involved in onboarding new "
         "sustainable products. The toolkit breaks down how to conduct sustainability reporting, investigate "
         "your institution's supply chain, and increase sustainable procurement. It's aimed at sustainability "
