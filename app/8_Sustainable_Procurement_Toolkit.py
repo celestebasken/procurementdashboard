@@ -62,11 +62,12 @@ def _load_toolkit_pdf_bytes() -> bytes | None:
 def main() -> None:
     st.title("Sustainable Procurement Toolkit")
     st.markdown(
-        "A practical, step-by-step guide for stakeholders looking to investigate and improve institutional "
-        "dining procurement -- from identifying the right sustainability standards and distributors, through "
-        "product classification, vendor outreach, internal labeling, and data entry. Written for UC Berkeley "
-        "through the Bonnie Reiss Climate Action Fellowship (2024-2025) by Celeste Basken and Victoria Quach, "
-        "and applicable beyond UC Berkeley to any campus starting or advancing this work."
+        "This toolkit was designed for anyone working to make food procurement at their campus more "
+        "sustainable, whether they are starting from zero or already actively involved in onboarding new "
+        "sustainable products. The toolkit breaks down how to conduct sustainability reporting, investigate "
+        "your institution's supply chain, and increase sustainable procurement. It's aimed at sustainability "
+        "coordinators, dining managers, students, chefs, or anyone in the supply chain interested in shifting "
+        "institutional levers."
     )
 
     pdf_bytes = _load_toolkit_pdf_bytes()

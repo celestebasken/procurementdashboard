@@ -97,20 +97,18 @@ def _render_home() -> None:
         )
         st.page_link("4_Competitive_Price_Checker.py", label="Open Price Checker", icon="💲")
 
-    st.divider()
-
-    st.subheader("Reference")
-    st.markdown("📚 **Sustainable Procurement Toolkit**")
-    st.markdown(
-        "A practical, step-by-step guide for stakeholders looking to investigate and improve institutional "
-        "dining procurement -- from identifying the right sustainability standards and distributors, through "
-        "product classification, vendor outreach, internal labeling, and data entry. Written for UC Berkeley "
-        "through the Bonnie Reiss Climate Action Fellowship (2024-2025), and applicable beyond UC Berkeley to "
-        "any campus starting or advancing this work."
-    )
-    st.page_link(
-        "8_Sustainable_Procurement_Toolkit.py", label="Open Sustainable Procurement Toolkit", icon="📚"
-    )
+        st.subheader("📚 Sustainable Procurement Toolkit")
+        st.markdown(
+            "This toolkit was designed for anyone working to make food procurement at their campus more "
+            "sustainable, whether they are starting from zero or already actively involved in onboarding new "
+            "sustainable products. The toolkit breaks down how to conduct sustainability reporting, "
+            "investigate your institution's supply chain, and increase sustainable procurement. It's aimed at "
+            "sustainability coordinators, dining managers, students, chefs, or anyone in the supply chain "
+            "interested in shifting institutional levers."
+        )
+        st.page_link(
+            "8_Sustainable_Procurement_Toolkit.py", label="Open Sustainable Procurement Toolkit", icon="📚"
+        )
 
 
 home_page = st.Page(_render_home, title="Home", icon="🏠", url_path="home", default=True)
