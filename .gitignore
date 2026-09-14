@@ -1,6 +1,12 @@
 # Data - keep local only
 data/
 
+# Runtime copy of reference/ files Streamlit's static-file server can serve
+# directly (e.g. the toolkit PDF, embedded via <iframe src="/app/static/...">
+# in app/8_Sustainable_Procurement_Toolkit.py) -- regenerated from reference/
+# on demand, not a second source of truth, so it isn't committed.
+app/static/
+
 # Virtual environment - Mac-specific, shouldn't be shared
 venv/
 

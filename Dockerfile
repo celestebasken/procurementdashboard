@@ -30,6 +30,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ app/
 COPY lib/ lib/
 COPY reference/ reference/
+COPY .streamlit/ .streamlit/
 
 # Placeholder mount point for the Render Persistent Disk holding
 # procurement.db -- see render.yaml's `disk` block and README.md's

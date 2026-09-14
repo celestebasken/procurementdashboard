@@ -97,6 +97,21 @@ def _render_home() -> None:
         )
         st.page_link("4_Competitive_Price_Checker.py", label="Open Price Checker", icon="💲")
 
+    st.divider()
+
+    st.subheader("Reference")
+    st.markdown("📚 **Sustainable Procurement Toolkit**")
+    st.markdown(
+        "A practical, step-by-step guide for stakeholders looking to investigate and improve institutional "
+        "dining procurement -- from identifying the right sustainability standards and distributors, through "
+        "product classification, vendor outreach, internal labeling, and data entry. Written for UC Berkeley "
+        "through the Bonnie Reiss Climate Action Fellowship (2024-2025), and applicable beyond UC Berkeley to "
+        "any campus starting or advancing this work."
+    )
+    st.page_link(
+        "8_Sustainable_Procurement_Toolkit.py", label="Open Sustainable Procurement Toolkit", icon="📚"
+    )
+
 
 home_page = st.Page(_render_home, title="Home", icon="🏠", url_path="home", default=True)
 roadmap_page = st.Page(_APP_DIR / "1_Campus_Roadmap.py", title="Campus Roadmap", icon="🌱", url_path="roadmap")
@@ -122,10 +137,16 @@ ghg_page = st.Page(
 data_sources_page = st.Page(
     _APP_DIR / "7_Data_Sources.py", title="Data Sources", icon="🗂️", url_path="data-sources"
 )
+toolkit_page = st.Page(
+    _APP_DIR / "8_Sustainable_Procurement_Toolkit.py",
+    title="Sustainable Procurement Toolkit",
+    icon="📚",
+    url_path="sustainable-procurement-toolkit",
+)
 nav_sections = {
     "": [home_page],
     "Dashboard": [roadmap_page, dining_page, classifier_page, price_checker_page],
-    "Reference": [definition_page, ghg_page, data_sources_page],
+    "Reference": [definition_page, ghg_page, data_sources_page, toolkit_page],
 }
 if _SHOW_ADMIN_PAGE:
     entity_review_page = st.Page(

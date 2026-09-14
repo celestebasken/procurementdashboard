@@ -1,0 +1,10 @@
+# server.enableStaticServing lets Streamlit serve files placed in
+# app/static/ at the fixed URL path /app/static/<filename> -- used by
+# app/8_Sustainable_Procurement_Toolkit.py to embed the toolkit PDF in an
+# <iframe> pointed at a real URL instead of a giant base64 data: URI (which
+# browsers/embedded previews can silently block from rendering in a nested
+# iframe). Applies whether Streamlit is invoked locally (.claude/launch.json)
+# or in Docker (see Dockerfile's CMD / render.yaml) -- one config, not a
+# flag duplicated across both invocations.
+[server]
+enableStaticServing = true
