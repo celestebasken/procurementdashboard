@@ -151,7 +151,7 @@ def _render_intro() -> None:
         "goals. It operates by default on data from UC Berkeley, but it can be adjusted to any dining system. "
         "This concept is expanded in the [Campus Roadmap](/roadmap) purchasing optimizer."
     )
-    with st.expander("How this works, and limitations"):
+    with st.expander("How this works, and limitations", expanded=True):
         st.markdown(
             "**The idea:** total menu cost (of protein ingredients) is the sum, over every protein ingredient, of (price per lb) x "
             "(average lbs of that protein per dish) x (how many times it's served). The optimizer reshuffles "
@@ -561,19 +561,20 @@ def _render_custom_scenario(baseline_df: pd.DataFrame, dining_hall: str) -> None
     )
     lock_editor_df = baseline_df[["ingredient", "category", "default_sus", "baseline_freq"]].copy()
     lock_editor_df["lock_at_frequency"] = float("nan")
-    edited_locks = st.data_editor(
-        lock_editor_df,
-        column_config={
-            "ingredient": st.column_config.TextColumn("Ingredient", disabled=True),
-            "category": st.column_config.TextColumn("Category", disabled=True),
-            "default_sus": st.column_config.TextColumn("Sustainable by default", disabled=True),
-            "baseline_freq": st.column_config.NumberColumn("Baseline frequency", disabled=True),
-            "lock_at_frequency": st.column_config.NumberColumn("Lock at frequency", min_value=0, step=1),
-        },
-        hide_index=True,
-        use_container_width=True,
-        key=f"mf_lock_editor_{dining_hall}",
-    )
+    with st.expander("Show lock table", expanded=False):
+        edited_locks = st.data_editor(
+            lock_editor_df,
+            column_config={
+                "ingredient": st.column_config.TextColumn("Ingredient", disabled=True),
+                "category": st.column_config.TextColumn("Category", disabled=True),
+                "default_sus": st.column_config.TextColumn("Sustainable by default", disabled=True),
+                "baseline_freq": st.column_config.NumberColumn("Baseline frequency", disabled=True),
+                "lock_at_frequency": st.column_config.NumberColumn("Lock at frequency", min_value=0, step=1),
+            },
+            hide_index=True,
+            use_container_width=True,
+            key=f"mf_lock_editor_{dining_hall}",
+        )
     locked = {
         row["ingredient"]: int(row["lock_at_frequency"])
         for _, row in edited_locks.iterrows()
@@ -621,7 +622,7 @@ def _render_hypothetical(baseline_df: pd.DataFrame, ghg_df: pd.DataFrame, dining
 
     c6, c7 = st.columns(2)
     with c6:
-        has_cap = not st.checkbox("Unlimited appearances (no cap)", value=True, key="hyp_unlimited")
+        has_cap = not st.checkbox("Unlimited appearances (no cap)", value=False, key="hyp_unlimited")
         max_freq = (
             int(st.number_input("Maximum appearances per cycle", min_value=0, value=3, step=1, key="hyp_cap"))
             if has_cap
