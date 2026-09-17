@@ -1,0 +1,6 @@
+Ingredient,Category,Conventional_price_lb,Sustainable_price_lb,Default_Sus
+Chicken Breast Grilled,Chicken,3.50,,No
+Chicken Thigh Sustainable,Chicken,,4.75,Yes
+Beef Ground Conventional,Beef,5.25,,No
+Beef Sustainable Cut,Beef,,7.10,Yes
+Cod Fillet,Fish,8.90,,No

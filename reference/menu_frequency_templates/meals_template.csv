@@ -1,0 +1,10 @@
+dining_hall,ingredient,category,expected_lb_meat_portion
+Sample Hall,Chicken Breast Grilled,Chicken,0.35
+Sample Hall,Chicken Breast Grilled,Chicken,0.35
+Sample Hall,Chicken Thigh Sustainable,Chicken,0.3
+Sample Hall,Beef Ground Conventional,Beef,0.25
+Sample Hall,Beef Ground Conventional,Beef,0.25
+Sample Hall,Beef Sustainable Cut,Beef,0.3
+Sample Hall,Cod Fillet,Fish,0.4
+Second Hall,Chicken Breast Grilled,Chicken,0.35
+Second Hall,Beef Ground Conventional,Beef,0.25

@@ -68,6 +68,16 @@ def _render_home() -> None:
         )
         st.page_link("1_Campus_Roadmap.py", label="Open Campus Roadmap", icon="🌱")
 
+        st.subheader("🍗 Menu Frequency")
+        st.markdown(
+            "This tool is designed to align cost and sustainability incentives by shifting how often different "
+            "ingredients are featured on the menu. It is currently programmed to optimize how often different "
+            "meat ingredients should be served over a menu cycle to achieve given cost or sustainability goals. "
+            "It operates by default on data from UC Berkeley, but it can be adjusted to any dining system. This "
+            "concept is expanded in the Campus Roadmap purchasing optimizer."
+        )
+        st.page_link("9_Menu_Frequency.py", label="Open Menu Frequency", icon="🍗")
+
         st.subheader("📋 Sustainability Auto-Reporting")
         st.markdown(
             "This tool is designed to automatically classify a campus' purchase orders as sustainable and "
@@ -120,6 +130,9 @@ classifier_page = st.Page(
 price_checker_page = st.Page(
     _APP_DIR / "4_Competitive_Price_Checker.py", title="Price Checker", icon="💲", url_path="price-checker"
 )
+menu_frequency_page = st.Page(
+    _APP_DIR / "9_Menu_Frequency.py", title="Menu Frequency", icon="🍗", url_path="menu-frequency"
+)
 definition_page = st.Page(
     _APP_DIR / "5_Our_Definition_of_Sustainable.py",
     title="Our Definition of Sustainable",
@@ -143,7 +156,7 @@ toolkit_page = st.Page(
 )
 nav_sections = {
     "": [home_page],
-    "Dashboard": [roadmap_page, dining_page, classifier_page, price_checker_page],
+    "Dashboard": [roadmap_page, dining_page, classifier_page, price_checker_page, menu_frequency_page],
     "Reference": [definition_page, ghg_page, data_sources_page, toolkit_page],
 }
 if _SHOW_ADMIN_PAGE:
