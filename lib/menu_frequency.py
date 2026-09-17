@@ -61,6 +61,20 @@ import pulp
 LOWER_MULTIPLIER_DEFAULT = 0.5
 UPPER_MULTIPLIER_DEFAULT = 1.5
 
+# Calibrated against real data, not fine-tuned: UC Berkeley's own source
+# export (data/menu_frequency_source/.../F25_Sp26_meals.csv) has 80-92 rows
+# for each of its three real dining halls (C3, XRDS, CKC) but exactly 1 row
+# for a fourth (FTH/Foothill) -- confirmed with the project owner as an
+# incomplete Jamix pull they don't plan to redo right now, not a parsing
+# bug. A single row means a single ingredient, which the optimizer can't
+# do anything with (the total-meals-fixed constraint pins it exactly, so
+# every scenario is a no-op) -- the original R app simply never listed
+# Foothill as a selectable dining hall at all. 5 is a low floor well below
+# the real halls' 80+ rows, not a claim about how much data is genuinely
+# "enough" to optimize meaningfully -- it only needs to separate a
+# near-empty entry like this one from a real menu cycle.
+MIN_MEAL_ROWS_FOR_DINING_HALL = 5
+
 REQUIRED_MEALS_COLUMNS = ["dining_hall", "ingredient", "category", "expected_lb_meat_portion"]
 REQUIRED_PRICE_COLUMNS = ["ingredient", "category", "conventional_price_lb", "sustainable_price_lb", "default_sus"]
 REQUIRED_GHG_COLUMNS = ["meat_type", "c_footprint_kg_c_per_kg_food"]
@@ -217,8 +231,22 @@ def load_existing_dataset(name: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.Dat
     return meals_df, prices_df, ghg_df
 
 
-def available_dining_halls(meals_df: pd.DataFrame) -> list[str]:
-    return sorted(h for h in meals_df["dining_hall"].dropna().unique() if h)
+def available_dining_halls(meals_df: pd.DataFrame, min_rows: int = MIN_MEAL_ROWS_FOR_DINING_HALL) -> list[str]:
+    """Dining halls with at least `min_rows` meal-cycle rows -- see
+    MIN_MEAL_ROWS_FOR_DINING_HALL for why a hall can have too little data
+    to be worth offering as a selectable option. Returns [] (not a crash)
+    if every hall in the data is this sparse."""
+    counts = meals_df["dining_hall"].dropna().value_counts()
+    return sorted(h for h, n in counts.items() if h and n >= min_rows)
+
+
+def excluded_dining_halls(meals_df: pd.DataFrame, min_rows: int = MIN_MEAL_ROWS_FOR_DINING_HALL) -> list[tuple[str, int]]:
+    """Dining halls present in the data but filtered out of
+    available_dining_halls() for having too few rows, paired with their
+    actual row count -- so the UI can say why a hall isn't selectable
+    instead of silently dropping it."""
+    counts = meals_df["dining_hall"].dropna().value_counts()
+    return sorted((h, int(n)) for h, n in counts.items() if h and n < min_rows)
 
 
 def available_categories(baseline_df: pd.DataFrame, ghg_df: pd.DataFrame) -> list[str]:

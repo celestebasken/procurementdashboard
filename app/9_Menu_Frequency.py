@@ -38,12 +38,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lib.menu_frequency import (
     LOWER_MULTIPLIER_DEFAULT,
+    MIN_MEAL_ROWS_FOR_DINING_HALL,
     UPPER_MULTIPLIER_DEFAULT,
     HypotheticalProtein,
     InfeasibleMenuScenarioError,
     available_categories,
     available_dining_halls,
     build_ingredient_baseline,
+    excluded_dining_halls,
     identify_ingredient_movers,
     list_existing_datasets,
     load_existing_dataset,
@@ -257,8 +259,15 @@ def _render_upload() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame] | None:
 
 def _render_baseline(meals_df, prices_df, ghg_df) -> tuple[str, pd.DataFrame] | None:
     halls = available_dining_halls(meals_df)
+    skipped = excluded_dining_halls(meals_df)
+    if skipped:
+        skipped_desc = ", ".join(f"{_dining_hall_label(h)} ({n} row(s))" for h, n in skipped)
+        st.caption(
+            f"⚠️ Not shown below -- too little data to optimize over (fewer than "
+            f"{MIN_MEAL_ROWS_FOR_DINING_HALL} meal rows): {skipped_desc}."
+        )
     if not halls:
-        st.error("No dining halls found in the uploaded menu cycle.")
+        st.error("No dining halls in this dataset have enough data to optimize over.")
         return None
     dining_hall = st.selectbox("Dining hall", halls, format_func=_dining_hall_label)
 

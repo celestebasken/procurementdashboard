@@ -10,6 +10,7 @@ from lib.menu_frequency import (
     available_categories,
     available_dining_halls,
     build_ingredient_baseline,
+    excluded_dining_halls,
     identify_ingredient_movers,
     list_existing_datasets,
     load_existing_dataset,
@@ -221,11 +222,32 @@ def test_build_ingredient_baseline_reports_missing_ingredients_without_crashing(
 
 def test_available_dining_halls_and_categories():
     meals, prices, ghg = _raw_frames()
-    assert available_dining_halls(meals) == ["C3", "XRDS"]
+    # min_rows=1 here since _raw_frames()'s C3 (4 rows) and XRDS (1 row) are
+    # both well below the real MIN_MEAL_ROWS_FOR_DINING_HALL default -- this
+    # test is about the listing/category logic, not the sparsity filter
+    # (see the dedicated tests below for that).
+    assert available_dining_halls(meals, min_rows=1) == ["C3", "XRDS"]
 
     baseline_df, _ = build_ingredient_baseline(meals, prices, ghg, "C3")
     assert set(available_categories(baseline_df, ghg)) >= {"Fish", "Beef"}
     assert "" not in available_categories(baseline_df, ghg)  # the blank meat_type row must not surface
+
+
+def test_available_dining_halls_excludes_sparse_halls_by_default():
+    # Mirrors the real UC Berkeley data: three dining halls with plenty of
+    # rows, one (Foothill-like) with just a single row -- too little for
+    # the optimizer to do anything with (a single ingredient can't move at
+    # all under the total-meals-fixed constraint).
+    rows = [{"dining_hall": "REAL", "ingredient": f"Ing {i}", "category": "Beef", "expected_lb_meat_portion": 0.3} for i in range(10)]
+    rows.append({"dining_hall": "SPARSE", "ingredient": "Only Ing", "category": "Beef", "expected_lb_meat_portion": 0.3})
+    meals = pd.DataFrame(rows)
+
+    assert available_dining_halls(meals) == ["REAL"]
+    assert excluded_dining_halls(meals) == [("SPARSE", 1)]
+
+    # A custom threshold should still be respected.
+    assert available_dining_halls(meals, min_rows=1) == ["REAL", "SPARSE"]
+    assert excluded_dining_halls(meals, min_rows=1) == []
 
 
 # --------------------------------------------------------------------------
