@@ -13,8 +13,11 @@ different engine from lib/optimization.py, not a variant of it:
     campus-reported per ingredient in Ingredient_prices.csv) rather than a
     $-split within a category -- matches the source R model exactly
     (optimization_backend.R's `prepare_optimization_metrics`).
-  - Scope: a single campus's (Berkeley's) dining halls, driven entirely by
-    three uploaded CSVs (meals, ingredient prices, GHG equivalents) -- no
+  - Scope: a single campus's (Berkeley's) dining halls, driven mainly by
+    two uploaded CSVs (meals, ingredient prices) plus one shared GHG
+    factor table committed with the app (reference/
+    menu_frequency_ghg_equivalents.csv -- a generic third-party emissions
+    reference, not campus-specific, so nobody uploads their own) -- no
     connection to the canonical `products`/`purchases` schema, since there
     is no real entity overlap between a menu "ingredient" (a protein cut)
     and a procurement "product" (a purchased SKU) at this grain.
@@ -92,18 +95,28 @@ DEFAULT_EXISTING_DATASETS_DIR = Path(
     or Path(__file__).resolve().parent.parent / "data" / "menu_frequency_source" / "Dashboardification" / "Basic_Data"
 )
 
-# One entry per known bundled dataset: display name -> (directory, meals
-# filename, prices filename, GHG filename). Currently only Berkeley, the
-# one campus with real menu-frequency data collected so far (see
+# GHG emissions factors per protein category are a generic third-party
+# reference table (SIMAP/UNH Sustainability Institute), not something
+# specific to any one campus's purchasing -- every dining system uses the
+# same factors, per project owner direction. Committed to the versioned
+# reference/ tree (unlike the real per-campus meals/prices data, this is
+# just published science, safe to ship with the app) and used for BOTH
+# "use existing data" and "upload my own data" -- nobody, including
+# Berkeley, supplies their own GHG file anymore.
+DEFAULT_GHG_PATH = Path(__file__).resolve().parent.parent / "reference" / "menu_frequency_ghg_equivalents.csv"
+
+# One entry per known bundled meals+prices dataset: display name ->
+# (directory, meals filename, prices filename). Currently only Berkeley,
+# the one campus with real menu-frequency data collected so far (see
 # CLAUDE.md) -- add more entries here as other campuses' data becomes
 # available. Each is checked for actually existing on disk by
-# list_existing_datasets() before being offered.
-_EXISTING_DATASETS: dict[str, tuple[Path, str, str, str]] = {
+# list_existing_datasets() before being offered. GHG is NOT part of this
+# tuple -- see DEFAULT_GHG_PATH.
+_EXISTING_DATASETS: dict[str, tuple[Path, str, str]] = {
     "UC Berkeley": (
         DEFAULT_EXISTING_DATASETS_DIR,
         "F25_Sp26_meals.csv",
         "Ingredient_prices.csv",
-        "GHG_equivalents.csv",
     ),
 }
 
@@ -200,14 +213,28 @@ def parse_ghg_csv(file) -> tuple[pd.DataFrame, list[str]]:
     return _parse(file, REQUIRED_GHG_COLUMNS, numeric_columns=["c_footprint_kg_c_per_kg_food"])
 
 
+def load_default_ghg_equivalents() -> pd.DataFrame:
+    """The one shared GHG factor table every campus uses (see
+    DEFAULT_GHG_PATH) -- parsed through the same parse_ghg_csv() an upload
+    would have gone through, so callers get an identically-shaped
+    DataFrame either way. Raises if the committed reference file itself is
+    somehow malformed (should never happen outside a bad edit to that
+    file, but this is a hard requirement of the engine, not something to
+    silently fall back on)."""
+    ghg_df, errors = parse_ghg_csv(DEFAULT_GHG_PATH)
+    if errors:
+        raise ValueError(f"Bundled GHG reference file failed to parse: {'; '.join(errors)}")
+    return ghg_df
+
+
 def list_existing_datasets() -> list[str]:
-    """Names of bundled datasets (see _EXISTING_DATASETS) that are actually
-    present on disk right now -- never a hardcoded list a given checkout or
-    deploy might not actually have. Returns [] in a fresh checkout, since
-    data/ is gitignored wholesale."""
+    """Names of bundled meals+prices datasets (see _EXISTING_DATASETS) that
+    are actually present on disk right now -- never a hardcoded list a
+    given checkout or deploy might not actually have. Returns [] in a
+    fresh checkout, since data/ is gitignored wholesale."""
     available = []
-    for name, (dir_path, meals_name, prices_name, ghg_name) in _EXISTING_DATASETS.items():
-        if all((dir_path / fname).exists() for fname in (meals_name, prices_name, ghg_name)):
+    for name, (dir_path, meals_name, prices_name) in _EXISTING_DATASETS.items():
+        if all((dir_path / fname).exists() for fname in (meals_name, prices_name)):
             available.append(name)
     return available
 
@@ -216,19 +243,20 @@ def load_existing_dataset(name: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.Dat
     """Loads a bundled dataset by name (one returned by
     list_existing_datasets()) through the exact same parse_*_csv functions
     an upload goes through, so behavior is identical either way -- this
-    just skips the file_uploader round-trip."""
+    just skips the file_uploader round-trip. GHG always comes from the one
+    shared reference table (load_default_ghg_equivalents()), not anything
+    campus-specific."""
     if name not in _EXISTING_DATASETS:
         raise ValueError(f"Unknown existing dataset {name!r}.")
-    dir_path, meals_name, prices_name, ghg_name = _EXISTING_DATASETS[name]
+    dir_path, meals_name, prices_name = _EXISTING_DATASETS[name]
 
     meals_df, meals_errors = parse_meals_csv(dir_path / meals_name)
     prices_df, prices_errors = parse_ingredient_prices_csv(dir_path / prices_name)
-    ghg_df, ghg_errors = parse_ghg_csv(dir_path / ghg_name)
 
-    errors = meals_errors + prices_errors + ghg_errors
+    errors = meals_errors + prices_errors
     if errors:
         raise ValueError(f"Bundled dataset {name!r} failed to parse: {'; '.join(errors)}")
-    return meals_df, prices_df, ghg_df
+    return meals_df, prices_df, load_default_ghg_equivalents()
 
 
 def available_dining_halls(meals_df: pd.DataFrame, min_rows: int = MIN_MEAL_ROWS_FOR_DINING_HALL) -> list[str]:

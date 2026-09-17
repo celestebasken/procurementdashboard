@@ -117,7 +117,7 @@ def test_list_existing_datasets_empty_when_files_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(
         menu_frequency,
         "_EXISTING_DATASETS",
-        {"UC Berkeley": (tmp_path, "meals.csv", "prices.csv", "ghg.csv")},
+        {"UC Berkeley": (tmp_path, "meals.csv", "prices.csv")},
     )
     assert list_existing_datasets() == []
 
@@ -129,11 +129,10 @@ def test_list_and_load_existing_dataset_when_files_present(tmp_path, monkeypatch
     (tmp_path / "prices.csv").write_text(
         "Ingredient,Category,Conventional_price_lb,Sustainable_price_lb,Default_Sus\nCod Fillet,Fish,9.91,,No\n"
     )
-    (tmp_path / "ghg.csv").write_text("Meat type,C_footprint_kg_C_per_kg_food\nFish,4.98\n")
     monkeypatch.setattr(
         menu_frequency,
         "_EXISTING_DATASETS",
-        {"UC Berkeley": (tmp_path, "meals.csv", "prices.csv", "ghg.csv")},
+        {"UC Berkeley": (tmp_path, "meals.csv", "prices.csv")},
     )
 
     assert list_existing_datasets() == ["UC Berkeley"]
@@ -141,12 +140,22 @@ def test_list_and_load_existing_dataset_when_files_present(tmp_path, monkeypatch
     meals_df, prices_df, ghg_df = load_existing_dataset("UC Berkeley")
     assert meals_df["ingredient"].iloc[0] == "Cod Fillet"
     assert prices_df["conventional_price_lb"].iloc[0] == pytest.approx(9.91)
-    assert ghg_df["c_footprint_kg_c_per_kg_food"].iloc[0] == pytest.approx(4.98)
+    # GHG is never campus-specific -- it always comes from the one shared,
+    # committed reference table, not anything found alongside meals/prices.
+    assert not ghg_df.empty
+    assert "meat_type" in ghg_df.columns
 
 
 def test_load_existing_dataset_unknown_name_raises():
     with pytest.raises(ValueError):
         load_existing_dataset("Not A Real Dataset")
+
+
+def test_load_default_ghg_equivalents_loads_the_real_committed_reference_file():
+    ghg_df = menu_frequency.load_default_ghg_equivalents()
+    assert not ghg_df.empty
+    assert {"meat_type", "c_footprint_kg_c_per_kg_food"} <= set(ghg_df.columns)
+    assert (ghg_df["meat_type"] == "Beef").any()
 
 
 # --------------------------------------------------------------------------

@@ -8,9 +8,10 @@ here is "how many times does this protein ingredient appear on a dining
 hall's menu," a genuinely different question from campus purchasing $, with
 no real entity overlap to share (see lib/menu_frequency.py's module
 docstring). This page has no lib.db/sqlite dependency at all and doesn't
-touch st.session_state["selected_campus"] -- it's driven entirely by
-whatever three CSVs the user uploads (meals, ingredient prices, GHG
-equivalents), not the shared database.
+touch st.session_state["selected_campus"] -- it's driven by whatever two
+CSVs the user uploads (meals, ingredient prices) plus one shared GHG
+factor table committed with the app (not campus-specific, so nobody
+uploads their own), not the shared database.
 
 v1 scope (per project owner direction): Feasibility Boundaries shows only
 headline numbers for Scenarios 1 & 2, not full charts. Custom Scenario
@@ -46,8 +47,8 @@ from lib.menu_frequency import (
     build_ingredient_baseline,
     identify_ingredient_movers,
     list_existing_datasets,
+    load_default_ghg_equivalents,
     load_existing_dataset,
-    parse_ghg_csv,
     parse_ingredient_prices_csv,
     parse_meals_csv,
     recompute_totals,
@@ -93,6 +94,11 @@ def _load_template_bytes(name: str) -> bytes:
 @st.cache_data(show_spinner=False)
 def _load_existing(dataset_name: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return load_existing_dataset(dataset_name)
+
+
+@st.cache_data(show_spinner=False)
+def _load_default_ghg() -> pd.DataFrame:
+    return load_default_ghg_equivalents()
 
 
 def _fmt_currency(x) -> str:
@@ -198,9 +204,10 @@ def _render_upload() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame] | None:
         return meals_df, prices_df, ghg_df
 
     st.markdown(
-        "Three files: a **menu cycle** (which ingredient was served, how often, at which dining hall), an "
-        "**ingredient price list** (conventional/sustainable $/lb and which is your default), and a **GHG "
-        "equivalents table** (emissions per lb, by protein category)."
+        "Two files: a **menu cycle** (which ingredient was served, how often, at which dining hall) and an "
+        "**ingredient price list** (conventional/sustainable $/lb and which is your default). Greenhouse-gas "
+        "factors are the same third-party reference table for every dining system, so there's nothing to "
+        "upload for that -- see \"How this works, and limitations\" above."
     )
     with st.expander("Not sure what to upload? Download templates"):
         st.markdown(
@@ -208,7 +215,7 @@ def _render_upload() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame] | None:
             "case-insensitively and don't need underscores or exact spacing (\"Dining Hall\" and "
             "\"dining_hall\" both work)."
         )
-        c1, c2, c3 = st.columns(3)
+        c1, c2 = st.columns(2)
         c1.download_button(
             "📥 Menu cycle template",
             data=_load_template_bytes("meals_template.csv"),
@@ -221,37 +228,26 @@ def _render_upload() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame] | None:
             file_name="ingredient_prices_template.csv",
             mime="text/csv",
         )
-        c3.download_button(
-            "📥 GHG equivalents template",
-            data=_load_template_bytes("ghg_equivalents_template.csv"),
-            file_name="ghg_equivalents_template.csv",
-            mime="text/csv",
-        )
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     meals_file = c1.file_uploader("Menu cycle", type=["csv", "xlsx", "xls"], key="mf_meals_upload")
     prices_file = c2.file_uploader("Ingredient prices", type=["csv", "xlsx", "xls"], key="mf_prices_upload")
-    ghg_file = c3.file_uploader("GHG equivalents", type=["csv", "xlsx", "xls"], key="mf_ghg_upload")
 
-    if not (meals_file and prices_file and ghg_file):
-        st.info("Upload all three files to get started.")
+    if not (meals_file and prices_file):
+        st.info("Upload both files to get started.")
         return None
 
     meals_df, meals_errors = parse_meals_csv(meals_file)
     prices_df, prices_errors = parse_ingredient_prices_csv(prices_file)
-    ghg_df, ghg_errors = parse_ghg_csv(ghg_file)
 
-    errors = (
-        [f"Menu cycle -- {e}" for e in meals_errors]
-        + [f"Ingredient prices -- {e}" for e in prices_errors]
-        + [f"GHG equivalents -- {e}" for e in ghg_errors]
-    )
+    errors = [f"Menu cycle -- {e}" for e in meals_errors] + [f"Ingredient prices -- {e}" for e in prices_errors]
     if errors:
         for e in errors:
             st.error(e)
         return None
 
-    st.success(f"Loaded {len(meals_df)} meal rows, {len(prices_df)} priced ingredients, {len(ghg_df)} GHG categories.")
+    ghg_df = _load_default_ghg()
+    st.success(f"Loaded {len(meals_df)} meal rows, {len(prices_df)} priced ingredients.")
     return meals_df, prices_df, ghg_df
 
 
