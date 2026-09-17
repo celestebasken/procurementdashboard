@@ -107,6 +107,39 @@ def _fmt_ghg(x) -> str:
     return f"{x:,.1f} kg CO2e" if pd.notna(x) else "N/A"
 
 
+def _render_pct_metric(col, label: str, pct_value: float, pct_suffix: str, secondary_label: str, secondary_value: str) -> None:
+    """A metric card with the % (or pts) change as the big, colored, arrowed
+    number and the underlying absolute figure small beneath it -- the
+    inverse of Streamlit's built-in st.metric(), which can only put color/
+    an arrow on the small delta, never on the big value. Per project owner
+    direction: chefs don't think in a dining hall's monthly protein-cost
+    dollar total, so that figure is demoted to context, and the % change
+    -- the actually decision-relevant number -- gets the visual weight.
+    Color/arrow convention matches what st.metric()'s default delta_color
+    already did before this swap (positive = green up-arrow, negative =
+    red down-arrow, not re-derived per metric's own semantics -- e.g. a
+    GHG increase still shows green/up, same as it did before)."""
+    if pd.isna(pct_value):
+        color, arrow, pct_text = "#808495", "", "N/A"
+    elif pct_value > 0:
+        color, arrow, pct_text = "#09ab3b", "▲", f"+{pct_value:.1f}{pct_suffix}"
+    elif pct_value < 0:
+        color, arrow, pct_text = "#ff2b2b", "▼", f"{pct_value:.1f}{pct_suffix}"
+    else:
+        color, arrow, pct_text = "#808495", "", f"0.0{pct_suffix}"
+
+    col.markdown(
+        f"""
+        <div style="line-height:1.3; margin-bottom: 0.5rem;">
+          <div style="font-size:0.875rem; opacity:0.7;">{label}</div>
+          <div style="font-size:1.9rem; font-weight:600; color:{color};">{arrow} {pct_text}</div>
+          <div style="font-size:0.8rem; opacity:0.6;">{secondary_label}: {secondary_value}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _render_intro() -> None:
     st.title("Menu Frequency")
     st.markdown(
@@ -116,25 +149,24 @@ def _render_intro() -> None:
         "goals. It operates by default on data from UC Berkeley, but it can be adjusted to any dining system. "
         "This concept is expanded in the [Campus Roadmap](/roadmap) purchasing optimizer."
     )
-    with st.expander("How this works, and where it falls short"):
+    with st.expander("How this works, and limitations"):
         st.markdown(
-            "**The idea:** total menu cost is the sum, over every protein ingredient, of (price per lb) x "
+            "**The idea:** total menu cost (of protein ingredients) is the sum, over every protein ingredient, of (price per lb) x "
             "(average lbs of that protein per dish) x (how many times it's served). The optimizer reshuffles "
-            "how often each ingredient appears -- never the total number of meals -- to hit a cost or "
+            "how often each ingredient appears (never the total number of meals) to hit a cost or "
             "sustainability goal, within a swing bound you set (e.g. no ingredient can move more than 50% from "
-            "how often it's served today).\n\n"
-            "**Known limitations**, carried over from the source analysis:\n"
-            "- Each ingredient is treated as either fully sustainable or fully conventional by default -- it "
-            "can't represent buying the same item from both a sustainable and a conventional supplier.\n"
+            "how often it's served today).\n"
+            "- This tool defines sustainable spend as the share of total protein spend that goes to ingredients marked as" \
+            " sustainable by default. For our purposes, we use [third-party definitions of sustainable from AASHE STARS or PGH.](/our-definition-of-sustainable/)\n\n"
+            "**Known limitations**:\n"
+            "- Each ingredient is treated as either fully sustainable or fully conventional by default. The model "
+            "can't currently represent buying the same item from both a sustainable and a conventional supplier.\n"
             "- Greenhouse-gas figures assume sustainable and conventional sourcing of the *same* protein have "
-            "identical emissions per lb -- a reported GHG change reflects which meat types get served, not "
-            "which supplier they came from.\n"
-            "- Swing bounds are a blunt, uniform percentage -- they don't know about kitchen labor, storage, "
-            "student demand, or contractual minimums. Treat any result as a starting point for chefs/menu "
-            "planners to sanity-check, not a final plan.\n"
-            "- Baseline frequency, price, and portion size are whatever your uploaded meal-cycle data averages "
-            "to -- if a price changed partway through the cycle (a contract renewal, a seasonal swing), that "
-            "gets blended into one number rather than tracked separately."
+            "identical emissions per lb. A reported GHG change reflects which meat types get served, not "
+            "which supplier they came from. See more on the page [Food Categories and Greenhouse Gas Emissions](/ghg).\n"
+            "- Baseline frequency, price, and portion size are whatever your uploaded meal-cycle data averages."
+            "to. If a price changed partway through the cycle, such as through a contract renewal or a seasonal swing,\n"
+            "that gets blended into one number rather than tracked separately."
         )
 
 
@@ -172,7 +204,7 @@ def _render_upload() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame] | None:
     )
     with st.expander("Not sure what to upload? Download templates"):
         st.markdown(
-            "These show the required columns -- extra columns are fine and ignored. Column names are matched "
+            "These show the required columns. Any extra columns are fine and will be ignored. Column names are matched "
             "case-insensitively and don't need underscores or exact spacing (\"Dining Hall\" and "
             "\"dining_hall\" both work)."
         )
@@ -255,17 +287,16 @@ def _render_baseline(meals_df, prices_df, ghg_df) -> tuple[str, pd.DataFrame] | 
 def _render_feasibility_boundaries(baseline_df: pd.DataFrame, dining_hall: str) -> None:
     st.subheader("2. Feasibility Boundaries")
     st.markdown(
-        "Scenarios 1 and 2 define the outer edges of what's possible: the most you could plausibly save "
-        "without giving up any current sustainability, and the most sustainable spend you could gain without "
-        "spending more. Use these to sanity-check a target before committing to one in Custom Scenario below "
-        "-- **this section only shows the headline numbers**, not full charts."
+        "Scenarios 1 and 2 define the outer edges of what's feasible. Scenario 1 is the most you could plausibly save "
+        "without reducing current sustainability. Scenario 2 is the most sustainable spend you could gain without "
+        "spending more. Use these to determine a target for the Custom Scenario below."
     )
     c1, c2 = st.columns(2)
     decrease_pct = c1.slider(
-        "Max decrease allowed per ingredient (%)", 0, 100, int((1 - LOWER_MULTIPLIER_DEFAULT) * 100), key="fb_decrease"
+        "Max decrease in frequency allowed per ingredient (%)", 0, 100, int((1 - LOWER_MULTIPLIER_DEFAULT) * 100), key="fb_decrease"
     )
     increase_pct = c2.slider(
-        "Max increase allowed per ingredient (%)", 0, 200, int((UPPER_MULTIPLIER_DEFAULT - 1) * 100), key="fb_increase"
+        "Max increase in frequency allowed per ingredient (%)", 0, 200, int((UPPER_MULTIPLIER_DEFAULT - 1) * 100), key="fb_increase"
     )
 
     state_key = f"mf_feasibility_{dining_hall}"
@@ -285,12 +316,12 @@ def _render_feasibility_boundaries(baseline_df: pd.DataFrame, dining_hall: str) 
     s1, s2 = stored
     c1, c2 = st.columns(2)
     c1.metric(
-        "Scenario 1 -- max cost reduction",
+        "Scenario 1 -- max cost reduction possible",
         f"{-s1.totals['cost_pct_change']:.1f}%",
         help="Minimizes cost while keeping sustainable spend at or above today's level.",
     )
     c2.metric(
-        "Scenario 2 -- max sustainable spend gain",
+        "Scenario 2 -- max sustainable spend gain possible",
         f"{s2.totals['sustainable_spend_pct_change']:+.1f}%",
         help="Maximizes sustainable spend while keeping cost at or below today's level.",
     )
@@ -392,12 +423,11 @@ def _render_charts(result) -> None:
 
 
 def _render_manual_override(result, dining_hall: str) -> None:
-    st.markdown("**Fine-tune the result manually**")
+    st.markdown("**Fine-tune the result manually and see how that would affect the outcomes**")
     st.caption(
-        "Edit \"Freq (optimized)\" directly to hand-adjust specific ingredients -- e.g. combining two "
-        "similar-priced options to land on a whole number, the way chefs do when translating this into a real "
-        "menu (see the SOP's Final Deliverable step). This recalculates totals with simple arithmetic; it does "
-        "**not** re-run the optimizer, so the swing bounds/locks above no longer apply once you edit here."
+        "If you would like to manually edit certain frequencies and see how that would affect the outcomes, you " \
+        "can do so below. Please note that this does not re-optimize the solution, it simply recalculates the" \
+        " totals based on your manual edits.\n"
     )
     editable = result.ingredient_results[
         ["ingredient", "category", "default_sus", "freq_baseline", "freq_optimized"]
@@ -423,26 +453,51 @@ def _render_manual_override(result, dining_hall: str) -> None:
     override_totals = st.session_state.get(f"mf_override_{dining_hall}")
     if override_totals:
         st.markdown("Totals after your manual adjustment (not re-optimized):")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total Cost", _fmt_currency(override_totals["optimized_cost"]))
-        c2.metric("Sustainable Spend Share", _fmt_pct(override_totals["optimized_sustainable_pct"]))
-        c3.metric("GHG", _fmt_ghg(override_totals["optimized_ghg"]))
+        c1, c2, c3, c4 = st.columns(4)
+        _render_pct_metric(
+            c1, "Total Cost Change", override_totals["cost_pct_change"], "%", "Total cost", _fmt_currency(override_totals["optimized_cost"])
+        )
+        _render_pct_metric(
+            c2,
+            "Sustainable Spend Share Change",
+            override_totals["optimized_sustainable_pct"] - override_totals["baseline_sustainable_pct"],
+            " pts",
+            "Sustainable spend share",
+            _fmt_pct(override_totals["optimized_sustainable_pct"]),
+        )
+        _render_pct_metric(
+            c3,
+            "Sustainable Spend $ Change",
+            override_totals["sustainable_spend_pct_change"],
+            "%",
+            "Sustainable spend",
+            _fmt_currency(override_totals["optimized_sustainable_spend"]),
+        )
+        _render_pct_metric(c4, "GHG Change", override_totals["ghg_pct_change"], "%", "GHG", _fmt_ghg(override_totals["optimized_ghg"]))
 
 
 def _render_scenario_results(result, dining_hall: str) -> None:
     t = result.totals
     st.markdown(f"#### Results — {result.scenario_name}")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Cost", _fmt_currency(t["optimized_cost"]), delta=f"{t['cost_pct_change']:+.1f}%")
-    c2.metric(
-        "Sustainable Spend Share",
+    _render_pct_metric(c1, "Total Cost Change", t["cost_pct_change"], "%", "Total cost", _fmt_currency(t["optimized_cost"]))
+    _render_pct_metric(
+        c2,
+        "Sustainable Spend Share Change",
+        t["optimized_sustainable_pct"] - t["baseline_sustainable_pct"],
+        " pts",
+        "Sustainable spend share",
         _fmt_pct(t["optimized_sustainable_pct"]),
-        delta=f"{t['optimized_sustainable_pct'] - t['baseline_sustainable_pct']:+.1f} pts",
     )
-    c3.metric(
-        "Sustainable Spend $", _fmt_currency(t["optimized_sustainable_spend"]), delta=f"{t['sustainable_spend_pct_change']:+.1f}%"
+    _render_pct_metric(
+        c3,
+        "Sustainable Spend $ Change",
+        t["sustainable_spend_pct_change"],
+        "%",
+        "Sustainable spend",
+        _fmt_currency(t["optimized_sustainable_spend"]),
     )
-    c4.metric("GHG", _fmt_ghg(t["optimized_ghg"]), delta=f"{t['ghg_pct_change']:+.1f}%")
+    _render_pct_metric(c4, "GHG Change", t["ghg_pct_change"], "%", "GHG", _fmt_ghg(t["optimized_ghg"]))
 
     _render_key_takeaways(result)
 
@@ -534,12 +589,12 @@ def _render_custom_scenario(baseline_df: pd.DataFrame, dining_hall: str) -> None
 
 
 def _render_hypothetical(baseline_df: pd.DataFrame, ghg_df: pd.DataFrame, dining_hall: str) -> None:
-    st.subheader("4. Hypothetical Proteins")
+    st.subheader("4. Trial a Potential New Protein on the Menu")
     st.markdown(
-        "Test whether a not-yet-purchased protein would actually earn a spot on the menu: it's added as a "
-        "genuine new option and the model re-solves. A recommended frequency of 0 means it isn't price- or "
-        "sustainability-competitive against what you already buy, given the cost target and bounds below; "
-        "above 0 means it's worth a closer look."
+        "Test whether a not-yet-purchased protein ingredient would actually earn a spot on the menu. " \
+        "This tool adds it as an potential option on the menu, then solves to see whether or not it would be included. " \
+        "A recommended frequency of 0 means it isn't price- or sustainability-competitive against what you already buy, " \
+        "given the cost target and bounds below; above 0 means it may be worth purchasing."
     )
     categories = available_categories(baseline_df, ghg_df)
     if not categories:
@@ -547,7 +602,7 @@ def _render_hypothetical(baseline_df: pd.DataFrame, ghg_df: pd.DataFrame, dining
         return
 
     c1, c2 = st.columns(2)
-    name = c1.text_input("Hypothetical protein name", "New hypothetical protein", key="hyp_name")
+    name = c1.text_input("Potential protein ingredient name", "New potential protein", key="hyp_name")
     category = c2.selectbox("Food category", categories, key="hyp_category")
 
     c3, c4, c5 = st.columns(3)
@@ -587,7 +642,7 @@ def _render_hypothetical(baseline_df: pd.DataFrame, ghg_df: pd.DataFrame, dining
     )
 
     state_key = f"mf_hyp_{dining_hall}"
-    if st.button("Test This Hypothetical Protein", type="primary", key="hyp_run"):
+    if st.button("Test This New Potential Protein", type="primary", key="hyp_run"):
         hyp = HypotheticalProtein(
             name=name,
             category=category,
@@ -646,16 +701,24 @@ def _render_hypothetical(baseline_df: pd.DataFrame, ghg_df: pd.DataFrame, dining
 
     t = result.totals
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Cost", _fmt_currency(t["optimized_cost"]), delta=f"{t['cost_pct_change']:+.1f}%")
-    c2.metric(
-        "Sustainable Spend Share",
+    _render_pct_metric(c1, "Total Cost Change", t["cost_pct_change"], "%", "Total cost", _fmt_currency(t["optimized_cost"]))
+    _render_pct_metric(
+        c2,
+        "Sustainable Spend Share Change",
+        t["optimized_sustainable_pct"] - t["baseline_sustainable_pct"],
+        " pts",
+        "Sustainable spend share",
         _fmt_pct(t["optimized_sustainable_pct"]),
-        delta=f"{t['optimized_sustainable_pct'] - t['baseline_sustainable_pct']:+.1f} pts",
     )
-    c3.metric(
-        "Sustainable Spend $", _fmt_currency(t["optimized_sustainable_spend"]), delta=f"{t['sustainable_spend_pct_change']:+.1f}%"
+    _render_pct_metric(
+        c3,
+        "Sustainable Spend $ Change",
+        t["sustainable_spend_pct_change"],
+        "%",
+        "Sustainable spend",
+        _fmt_currency(t["optimized_sustainable_spend"]),
     )
-    c4.metric("GHG", _fmt_ghg(t["optimized_ghg"]), delta=f"{t['ghg_pct_change']:+.1f}%")
+    _render_pct_metric(c4, "GHG Change", t["ghg_pct_change"], "%", "GHG", _fmt_ghg(t["optimized_ghg"]))
 
 
 def main() -> None:
