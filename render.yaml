@@ -17,5 +17,7 @@ services:
     envVars:
       - key: PROCUREMENT_DB_PATH
         value: /var/data/procurement.db
+      - key: MENU_FREQUENCY_DATA_DIR
+        value: /var/data/menu_frequency_source
       - key: SHOW_ADMIN_PAGE
         value: "false"

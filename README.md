@@ -50,12 +50,19 @@ The app deploys as a Docker service (`Dockerfile`, `render.yaml`) rather than Re
      ```
      (exact SSH address is shown on the service's "Connect" tab in the dashboard).
    - Confirm it landed, using the dashboard's web Shell tab: `ls -la /var/data`.
-3. Restart the service (dashboard → Manual Deploy → "Restart") so `PROCUREMENT_DB_PATH=/var/data/procurement.db` picks up the uploaded file.
+3. Same idea for the Menu Frequency page's "Use existing data" option (`app/9_Menu_Frequency.py`): its bundled UC Berkeley dataset (`data/menu_frequency_source/Dashboardification/Basic_Data/*.csv`) is also real, gitignored data, never in the repo or image — without this step the page still works, it just falls back to upload-only, since `lib.menu_frequency.list_existing_datasets()` only offers a dataset that's actually present on disk. Upload the three CSVs flat into their own directory on the same disk:
+   ```
+   ssh <service-name>@ssh.<region>.render.com 'mkdir -p /var/data/menu_frequency_source'
+   cat data/menu_frequency_source/Dashboardification/Basic_Data/F25_Sp26_meals.csv   | ssh <service-name>@ssh.<region>.render.com 'cat > /var/data/menu_frequency_source/F25_Sp26_meals.csv'
+   cat data/menu_frequency_source/Dashboardification/Basic_Data/Ingredient_prices.csv | ssh <service-name>@ssh.<region>.render.com 'cat > /var/data/menu_frequency_source/Ingredient_prices.csv'
+   cat data/menu_frequency_source/Dashboardification/Basic_Data/GHG_equivalents.csv   | ssh <service-name>@ssh.<region>.render.com 'cat > /var/data/menu_frequency_source/GHG_equivalents.csv'
+   ```
+4. Restart the service (dashboard → Manual Deploy → "Restart") so `PROCUREMENT_DB_PATH=/var/data/procurement.db` and `MENU_FREQUENCY_DATA_DIR=/var/data/menu_frequency_source` pick up the uploaded files.
 
 **Notes:**
 
 - `SHOW_ADMIN_PAGE=false` is set in `render.yaml`, so the Entity Match Review page (the only page that mutates the database) is not reachable on the deployed instance — it has no access control yet, so it isn't exposed publicly until that's built. Locally it's shown by default (unset env var).
-- Any future weight-dictionary or reference-table update still has to go through the normal local pipeline and get re-uploaded the same way; there's no admin write path on the live deployment yet.
+- Any future weight-dictionary, reference-table, or menu-frequency-dataset update still has to go through the normal local pipeline and get re-uploaded the same way; there's no admin write path on the live deployment yet.
 - Local Docker build/run has not been tested on this machine (Docker isn't installed here) — the first real build test will be Render's own build step. If it fails, the likely culprits are a missing WeasyPrint system library (check the exact `apt-get` package names against the Debian release `python:3.13-slim` resolves to) or a `PORT`/`server.address` binding issue in the `Dockerfile`'s `CMD`.
 
 ## Status
